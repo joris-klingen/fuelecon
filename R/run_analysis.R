@@ -8,6 +8,7 @@ source("R/00_setup.R")
 source("R/01_fleet.R")
 source("R/02_efficiency.R")
 source("R/03_adjusted.R")
+source("R/04_segments.R")
 
 # Dutch convention: "." groups thousands, "," is the decimal separator.
 fmt <- function(x) formatC(x, format = "d", big.mark = ".", decimal.mark = ",")
@@ -83,6 +84,33 @@ with(adjusted_facts, {
   cat(sprintf("  bij gewicht 2000   %.2f l/100km (%+.1f%% t.o.v. 2000)\n",
               fleet_cf_24, fleet_cf_change))
   cat(sprintf("  kosten van zwaarder worden: %.2f l/100km\n", fleet_penalty_24))
+})
+
+cat("\nZelfde auto, vijf jaar jonger\n")
+cat(  "-----------------------------\n")
+with(segment_facts, {
+  cat(sprintf("Bouwjaar 2024 t.o.v. 2019, zelfde carrosserie en grootteklasse:\n"))
+  cat(sprintf("  %.2f -> %.2f l/100km, besparing %.2f l/100km (%.1f%%)\n",
+              save_2024_old, save_2024_new, save_2024, save_2024_pct))
+  cat(sprintf("  beide kanten %.0f%% resp. %.0f%% gemeten op WLTP: schone vergelijking\n",
+              save_2024_meas_o, save_2024_meas_n))
+  cat(sprintf("  controle op werkelijke lengte: %.2f l/100km (%.1f%%)\n",
+              save_2024_len, save_2024_lenpct))
+  cat(sprintf("Slechtste bouwjaar om te kopen: %d (%.2f l/100km, dus duurder dan\n",
+              worst_year, worst_saving))
+  cat(sprintf("  de vijf jaar oudere auto van hetzelfde formaat)\n"))
+  cat(sprintf("Beste vroege jaar: %d (%.2f l/100km bespaard)\n", best_early_year, best_early))
+  cat(sprintf("\nSamenstellingseffect: bij de type- en grootteverdeling van 2000\n"))
+  cat(sprintf("  zou 2024 op %.2f l/100km liggen i.p.v. %.2f (%.2f l/100km verschil)\n",
+              fixed_2024, actual_2024, mix_2024))
+
+  cat("\nGrootte EN aandrijving vastgehouden (benzine, middenklasse):\n")
+  cat(sprintf("  %.2f (2000) -> %.2f (2013) -> %.2f l/100km (2024)\n",
+              petrol_mid_2000, petrol_mid_2013, petrol_mid_2024))
+  cat(sprintf("  %+.1f%% tot 2013, daarna %+.1f%%: de motor staat sinds 2013 stil\n",
+              petrol_mid_early, petrol_mid_late))
+  cat(sprintf("  klein sinds 2013 %+.1f%%, zeer groot %+.1f%%\n",
+              petrol_small_late, petrol_big_late))
 })
 
 cat(sprintf("\nFiguren geschreven naar %s\n", FIG_DIR))

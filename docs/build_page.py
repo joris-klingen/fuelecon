@@ -14,6 +14,44 @@ def img(name: str) -> str:
 
 FIGURES = [
     (
+        "14_five_year_replacement_saving",
+        "What five years newer is worth, same body type and size",
+        "Replace your car with one five years younger and roughly the same size. "
+        "Through the middle 2010s that bought you nothing \u2014 a 2019 car burned "
+        "<em>more</em> than the 2014 car it replaced. By 2024 it is worth about two "
+        "litres per 100 km. The second line repeats the calculation on true vehicle "
+        "length rather than mass bands; the two bracket the answer at 1.7 to 2.0.",
+    ),
+    (
+        "12_consumption_by_car_type",
+        "On-road consumption by build year, one line per body type",
+        "Hatchbacks and MPVs improve steadily. Sedans and coupes rise after 2012, "
+        "because as the mainstream moved to other shapes those categories were left "
+        "to large and fast cars.",
+    ),
+    (
+        "13_consumption_by_size_class",
+        "The same by size class",
+        "The like-for-like view a buyer would face. The heaviest band dives after "
+        "2020, but that is plug-in hybrids arriving rather than engines improving: "
+        "by 2024, 82 percent of that band is plug-in.",
+    ),
+    (
+        "16_petrol_by_size_class",
+        "Size and powertrain both held fixed: petrol cars only",
+        "The sobering figure. With the drivetrain held constant, a petrol car of a "
+        "given size improved about 19 percent to 2013 and has been flat since. The "
+        "smallest and largest classes now burn <em>more</em> than their 2013 "
+        "equivalents. Nearly all of the headline saving is switching drivetrain, "
+        "not better engines.",
+    ),
+    (
+        "15_fixed_weight_composition",
+        "Fleet consumption at the actual and at the 2000 mix of types and sizes",
+        "Holding the composition of body types and size classes at its 2000 shares. "
+        "The gap is what buying differently shaped cars cost: 0.44 l/100 km by 2024.",
+    ),
+    (
         "08_typeapproval_vs_real",
         "Combustion engines: what the test said, and what they burned",
         "Everything converted to one cycle, then corrected to on-road litres. The "
@@ -300,7 +338,7 @@ HTML = f"""<title>Nine Million Cars</title>
   .headline .from {{ font-size: var(--step-3); font-weight: 700; color: var(--magenta); }}
   .headline .arrow {{ font-size: var(--step-2); color: var(--ink-faint); }}
   .headline .to {{ font-size: var(--step-3); font-weight: 700; color: var(--blue); }}
-  .headline .unit {{ font-size: var(--step-1); color: var(--ink-soft); }}
+  .headline .unit {{ font-size: var(--step-1); color: var(--ink-soft); max-width: 22ch; }}
   .headline .gloss {{ color: var(--ink-soft); flex: 1 1 18rem; min-width: 0; }}
 
   /* ---- prose ---- */
@@ -418,14 +456,12 @@ HTML = f"""<title>Nine Million Cars</title>
       can be compared at all.
     </p>
     <div class="headline">
-      <span class="from">-52%</span>
-      <span class="arrow">&rarr;</span>
-      <span class="to">-40%</span>
-      <span class="unit">like for like</span>
+      <span class="from">2.0</span>
+      <span class="unit">l/100 km saved by a five-year-newer car of the same size</span>
       <span class="gloss">
-        Type approval claims fuel economy halved between build years 2000 and 2024.
-        Corrected to one measurement cycle, litres actually burned, and constant
-        kerb mass, the improvement is 40 percent. The rest was the laboratory.
+        Almost none of that is a better engine. Hold the drivetrain fixed as well
+        and a petrol car of a given size has not improved since 2013 &mdash; the
+        saving is people buying hybrids.
       </span>
     </div>
   </header>
@@ -448,6 +484,60 @@ HTML = f"""<title>Nine Million Cars</title>
         percent, self-charging hybrid 8.1, diesel 7.7, battery-electric 6.5,
         plug-in hybrid 5.6, and LPG 0.7. Read those as the composition of what
         survives, not of what was ever sold.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Replacing your car</h2>
+    <p class="section-lede">
+      Same body type, same size class &mdash; what does five years of progress buy?
+    </p>
+    <div class="table-scroll">
+      <table>
+        <caption>On-road litres per 100 km, weighted by the stock of the newer car.</caption>
+        <thead>
+          <tr>
+            <th scope="col">Newer car</th>
+            <th scope="col" colspan="2">Replaces</th>
+            <th scope="col" colspan="2">Saving</th>
+            <th scope="col">Basis</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">2010</th><td class="num">2005</td><td class="yr"></td>
+              <td class="num">0.70 l</td><td class="yr">8.7%</td>
+              <td class="num delta">modelled</td></tr>
+          <tr><th scope="row">2013</th><td class="num">2008</td><td class="yr"></td>
+              <td class="num">1.28 l</td><td class="yr">16.0%</td>
+              <td class="num delta">modelled</td></tr>
+          <tr><th scope="row">2019</th><td class="num">2014</td><td class="yr"></td>
+              <td class="num delta up">-0.74 l</td><td class="yr">-10.8%</td>
+              <td class="num delta">modelled</td></tr>
+          <tr><th scope="row">2024</th><td class="num">2019</td><td class="yr"></td>
+              <td class="num delta down">2.02 l</td><td class="yr">25.1%</td>
+              <td class="num delta">measured</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="prose" style="margin-top:2rem">
+      <p>
+        Only the last row is a clean comparison: both sides carry a measured WLTP
+        figure, so no conversion assumption enters. Repeating it on true vehicle
+        length rather than mass bands gives 1.66 l/100 km, so take the honest answer
+        as <strong>roughly 1.7 to 2.0 litres per 100 km, about a fifth</strong>.
+      </p>
+      <p>
+        Cars built through the middle 2010s were worse than the five-year-older car
+        they replaced. Part of that is measured &mdash; same-size cars kept gaining
+        mass and power &mdash; and part is the widening laboratory gap, which those
+        rows inherit as an assumption.
+      </p>
+      <p>
+        The uncomfortable part: hold the drivetrain fixed as well and a petrol car
+        of a given size improved about 19 percent to 2013 and has been flat since,
+        with the smallest and largest classes now slightly worse. Nearly all of the
+        saving above is people buying hybrids rather than engines getting better.
       </p>
     </div>
   </section>
@@ -493,7 +583,7 @@ HTML = f"""<title>Nine Million Cars</title>
   </section>
 
   <section>
-    <h2>How the three corrections work</h2>
+    <h2>How the corrections work</h2>
     <p class="section-lede">
       None of this is a black box. Each correction is either estimated from these
       cars or sourced to a named document.

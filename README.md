@@ -194,6 +194,63 @@ a larger car electrified it left the petrol category and took its mass with it. 
 fleet-wide mass gain is largely that composition shift, so the correction is only
 meaningful with the powertrains pooled. Both are reported.
 
+## Replacing your car with a five-year-newer one
+
+Holding the kind of car fixed — same body type, same size class — how much fuel
+does five years of progress buy? (`sql/060_segments.sql`, figures 12–16.)
+
+| Newer car built | Replaces | Saving |
+|---|---|---|
+| 2010 | 2005 | 0.70 l/100km (8.7%) |
+| 2013 | 2008 | 1.28 l/100km (16.0%) |
+| 2019 | 2014 | **−0.74 l/100km (−10.8%)** |
+| 2024 | 2019 | **2.02 l/100km (25.1%)** |
+
+The 2024-against-2019 row is the only clean one: 100% and 91% of the two sides
+carry a measured WLTP figure, so no conversion assumption enters. Repeating it on
+true vehicle length instead of mass bands gives 1.66 l/100km (21.6%) — the
+mass-band version overstates by about 0.35 l/100km, because equipment mass creep
+means a 1,200 kg car in 2024 is a physically smaller car than a 1,200 kg car in
+2019. Take the honest answer as **roughly 1.7–2.0 l/100 km, or about a fifth**.
+
+Cars built through the middle 2010s were *worse* than the five-year-older car they
+replaced. Part of that is measured — same-size cars kept gaining mass and power —
+and part is the modelled NEDC gap ramp, since a 2018 car with the same laboratory
+figure as a 2013 car burned more on the road. Comparisons whose older side is a
+converted NEDC figure inherit that assumption; `pct_measured_old` and
+`pct_measured_new` flag which rows those are.
+
+### The saving is powertrain switching, not engine progress
+
+Hold size *and* powertrain fixed, and the picture changes completely (figure 16).
+Petrol cars, on-road litres, by size class:
+
+| Size class | 2000 | 2013 | 2024 | since 2013 |
+|---|---|---|---|---|
+| Small (<950 kg) | 6.9 | 5.7 | 5.9 | **+3.1%** |
+| Middle (1150–1350 kg) | 9.36 | 7.54 | 7.07 | −6.3% |
+| Very large (≥1600 kg) | 14.1 | 10.8 | 12.2 | **+8.0%** |
+
+A petrol car of a given size improved about 19% between 2000 and 2013 and has
+been flat or slightly worse since. The small and very large classes now burn
+*more* than their 2013 equivalents. Practically all of the 25% five-year saving
+above comes from buying a different kind of drivetrain — by 2024, 82% of the
+heaviest size band is plug-in hybrid, consuming 4.3 l/100 km against 12.2 for a
+petrol car of the same mass.
+
+That last figure leans hard on one assumption: the Commission's +267% real-world
+correction for plug-in hybrids. If those cars are charged less than the OBFCM
+sample charged them, the saving is smaller.
+
+### Why size is proxied by kerb mass
+
+RDW records a length for only 53% of cars built before 2016 (98% by 2024), and the
+missing half is not random — cars with a recorded length in 2010 average 1,085 kg
+against 1,208 kg for those without. Segmenting on length would compare a biased,
+lighter early sample against a complete late one and read the difference as
+progress. Kerb mass is recorded for every car in every year. The length-based
+version is computed anyway over 2016–2024 as a check, and is reported alongside.
+
 ## Reading the numbers correctly
 
 Four things will produce wrong answers if ignored. All four are handled in the SQL
@@ -249,11 +306,16 @@ is ~90% for 2000-2005 vintages against ~99.8% today.
 | `fleet_fuel_trend` | Fleet l/100km, electric counted as zero litres |
 | `realworld_gap_nedc` / `realworld_gap_wltp` | The gap assumptions, as data |
 | `mass_regression_stats` | Within-year moments for the constant-mass correction |
+| `consumption_by_type` / `consumption_by_size` | On-road l/100km per year × body type / size class |
+| `consumption_by_segment` | The same by type × size, the replacement cell |
+| `segment_saving` / `segment_saving_summary` | Five-year replacement saving per segment |
+| `segment_saving_length` | The same on true length bands, 2016-2024 |
+| `fixed_weight_index` | Fleet consumption at the 2000 type and size mix |
 
 The 9.5M-row `vehicles` table stays in `data/fuelecon.duckdb`; query it directly for
 anything the aggregates do not cover.
 
-`R/run_analysis.R` writes eleven figures to `output/figures/`. `docs/results.html`
+`R/run_analysis.R` writes sixteen figures to `output/figures/`. `docs/results.html`
 presents them with the numbers and caveats; regenerate it with
 `python3 docs/build_page.py` after re-running the analysis.
 

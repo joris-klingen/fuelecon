@@ -66,6 +66,23 @@ or plotting into SQL.
   Always use the pooled-powertrain version for fleet statements — within petrol
   alone, mass is nearly flat because heavy cars electrified out of the category.
 
+## Segments (060)
+
+Size is proxied by **kerb mass**, not length: length is recorded for only 53% of
+pre-2016 cars and the missing half is systematically 120 kg heavier, so a
+length-based segment would read sample bias as progress. The cost is that mass
+creep makes a fixed mass band drift toward physically smaller cars, which
+overstates the saving; `segment_saving_length` quantifies that on 2016-2024.
+
+Before quoting any five-year saving, check `pct_measured_old` / `pct_measured_new`.
+Only 2024-vs-2019 has both sides essentially measured on WLTP; earlier rows inherit
+the assumed NEDC gap ramp and are modelled, not measured.
+
+Hold size *and* powertrain fixed (`mean_l_petrol`) before claiming engine progress.
+Petrol cars of a given size have been flat since 2013 — the headline saving is
+almost entirely people buying hybrids, and in the heaviest band it rests on the
++267% PHEV real-world correction.
+
 ## Domain traps
 
 These are the ways this dataset produces confident wrong answers. All four are
