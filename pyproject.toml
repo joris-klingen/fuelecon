@@ -1,0 +1,42 @@
+[project]
+name = "fuelecon"
+version = "0.1.0"
+description = "Fuel efficiency and fleet composition of Dutch passenger cars (build years 2000-2024) from RDW open data"
+readme = "README.md"
+authors = [
+    { name = "Joris Klingen", email = "j.j.klingen@cpb.nl" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "duckdb>=1.1",
+    "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+plot = [
+    "matplotlib>=3.9",
+    "pandas>=2.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.7",
+]
+
+[project.scripts]
+fuelecon = "fuelecon.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.8.17,<0.9.0"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,18 @@
+# Data and derived artefacts are never committed: they are reproducible from RDW
+# open data via `fuelecon ingest` / `fuelecon build`.
+data/
+output/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+uv.lock.bak
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
