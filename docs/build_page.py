@@ -23,6 +23,16 @@ FIGURES = [
         "length rather than mass bands; the two bracket the answer at 1.7 to 2.0.",
     ),
     (
+        "17_saving_by_basis",
+        "The same saving computed three ways",
+        "A check on whether the corrections manufactured the shape above. They did "
+        "not: the dip is present in the untouched NEDC declarations, which cover "
+        "almost every car on both sides up to 2019. The real-world gap ramp deepens "
+        "the trough about fourfold without creating it, and the 2024 recovery is "
+        "identical on both corrected bases. The raw line stops at 2020, after which "
+        "NEDC declarations survive only for a small self-selected residue.",
+    ),
+    (
         "12_consumption_by_car_type",
         "On-road consumption by build year, one line per body type",
         "Hatchbacks and MPVs improve steadily. Sedans and coupes rise after 2012, "

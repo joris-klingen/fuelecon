@@ -220,6 +220,40 @@ figure as a 2013 car burned more on the road. Comparisons whose older side is a
 converted NEDC figure inherit that assumption; `pct_measured_old` and
 `pct_measured_new` flag which rows those are.
 
+### Is the V-shape an artefact of the corrections?
+
+Fair question, since two modelling steps sit between the registry and that curve.
+It is testable, and `segment_saving_basis` (figure 17) runs the test: the identical
+saving computed on three bases.
+
+| Newer car | On the road | Type approval, no gap | Raw NEDC, uncorrected |
+|---|---|---|---|
+| 2013 | 1.28 | 1.77 | **1.50** |
+| 2019 | −0.74 | −0.14 | **−0.18** |
+| 2024 | 2.02 | 2.00 | (6% coverage) |
+
+**The V is not manufactured by the corrections.** It is there in the untouched NEDC
+declarations, which cover ~100% of both sides for every comparison up to 2019: the
+saving peaks in 2013 and crosses into negative territory in 2018–19 on raw data.
+
+What the corrections do:
+
+- The **cycle conversion cannot be responsible at all.** For NEDC-era cars
+  `sql/050` builds the on-road figure from the raw NEDC value times that year's
+  gap, never via the WLTP-equivalent — the 040 factor never enters. (The one
+  exception is plug-in hybrids, negligible before 2018.)
+- The **real-world gap ramp deepens the trough and flattens the early limb.** In
+  every NEDC-era pair the newer car carries a larger assumed gap, which subtracts
+  0.4–0.6 l/100 km from the measured saving throughout. It roughly quadruples the
+  2019 dip (−0.18 raw → −0.74 on the road) without creating it.
+- The **2024 recovery is not model-dependent**: on-road and type approval agree to
+  0.02 l/100 km, because both sides carry the same WLTP gap factor and it cancels.
+
+The raw column stops being informative after 2020 — NEDC declarations survive for
+only 5.9% of 2024 cars, and that residue is self-selected toward long-running type
+approvals. The handover years (2018–2021) carry the most model dependence, since
+they pair a converted old side with a measured new one.
+
 ### The saving is powertrain switching, not engine progress
 
 Hold size *and* powertrain fixed, and the picture changes completely (figure 16).
@@ -311,11 +345,12 @@ is ~90% for 2000-2005 vintages against ~99.8% today.
 | `segment_saving` / `segment_saving_summary` | Five-year replacement saving per segment |
 | `segment_saving_length` | The same on true length bands, 2016-2024 |
 | `fixed_weight_index` | Fleet consumption at the 2000 type and size mix |
+| `segment_saving_basis` | The saving on three bases, to test the corrections |
 
 The 9.5M-row `vehicles` table stays in `data/fuelecon.duckdb`; query it directly for
 anything the aggregates do not cover.
 
-`R/run_analysis.R` writes sixteen figures to `output/figures/`. `docs/results.html`
+`R/run_analysis.R` writes seventeen figures to `output/figures/`. `docs/results.html`
 presents them with the numbers and caveats; regenerate it with
 `python3 docs/build_page.py` after re-running the analysis.
 

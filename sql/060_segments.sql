@@ -240,3 +240,51 @@ JOIN w2000 w ON w.car_type = c.car_type AND w.size_id = c.size_id
 JOIN actual a ON a.build_year = c.build_year
 GROUP BY c.build_year, a.l_actual
 ORDER BY c.build_year;
+
+-- Is the V-shape in the five-year saving an artefact of the corrections?
+--
+-- The question is a fair one, because two modelling steps sit between the registry
+-- and that curve. This table recomputes the identical saving on three bases so the
+-- answer can be read off rather than argued:
+--
+--   saving_realworld     cycle-converted and gap-corrected (the headline)
+--   saving_typeapproval  cycle-converted, no real-world gap
+--   saving_raw_nedc      the untouched NEDC declarations, no correction at all
+--
+-- Note first that the cycle-conversion factor from 040 cannot be the culprit: for
+-- NEDC-era cars sql/050 builds the on-road figure from the raw NEDC value times
+-- that year's gap, never via the WLTP-equivalent. Only the gap ramp enters.
+--
+-- `pct_with_nedc_new` is essential to reading the last column. NEDC declarations
+-- are near-universal up to 2019 and then collapse (5.9% of 2024 cars), and the
+-- residue is self-selected toward long-running type approvals. The raw column is
+-- informative up to year_new 2020 and should not be read after it.
+CREATE OR REPLACE TABLE segment_saving_basis AS
+WITH seg AS (
+    SELECT s.build_year, s.car_type, s.size_id,
+           count(*)                                        AS n,
+           count(v.l_100km_nedc)                           AS n_nedc,
+           avg(s.l_100km_real)                             AS l_real,
+           avg(s.l_100km_wltp_equiv)                       AS l_ta,
+           avg(v.l_100km_nedc)                             AS l_nedc
+    FROM vehicles_segment s
+    JOIN vehicles v USING (kenteken)
+    WHERE s.car_type <> 'overig' AND s.size_id IS NOT NULL
+    GROUP BY ALL
+    HAVING count(*) >= 200
+)
+SELECT
+    n.build_year                                           AS year_new,
+    n.build_year - 5                                       AS year_old,
+    sum(n.n)                                               AS vehicles,
+    round(sum((o.l_real  - n.l_real)  * n.n) / sum(n.n), 3) AS saving_realworld,
+    round(sum((o.l_ta    - n.l_ta)    * n.n) / sum(n.n), 3) AS saving_typeapproval,
+    round(sum((o.l_nedc  - n.l_nedc)  * n.n) / sum(n.n), 3) AS saving_raw_nedc,
+    round(100.0 * sum(n.n_nedc) / sum(n.n), 1)             AS pct_with_nedc_new,
+    round(100.0 * sum(o.n_nedc) / sum(o.n), 1)             AS pct_with_nedc_old
+FROM seg n
+JOIN seg o
+  ON o.car_type = n.car_type AND o.size_id = n.size_id
+ AND o.build_year = n.build_year - 5
+GROUP BY n.build_year
+ORDER BY n.build_year;

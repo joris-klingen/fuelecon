@@ -15,6 +15,7 @@ by_size    <- read_table("consumption_by_size")
 saving     <- read_table("segment_saving_summary")
 saving_len <- read_table("segment_saving_length")
 fixed_w    <- read_table("fixed_weight_index")
+basis      <- read_table("segment_saving_basis")
 
 CAR_TYPE_LEVELS <- c("hatchback", "stationwagen", "MPV", "sedan", "coupe/cabriolet")
 
@@ -111,6 +112,34 @@ p_saving <- cpb_line(saving_plot, x = build_year, y = l, colour = reeks,
 
 fig(p_saving, "14_five_year_replacement_saving")
 
+# ---- figure 17: is the V-shape an artefact of the corrections? ----------------
+
+# The same five-year saving on three bases. The dip into negative territory is
+# present in the untouched NEDC declarations, so it is not manufactured by the
+# corrections; what the real-world gap ramp does is push the whole NEDC-era curve
+# down, because the newer car in every pair carries a larger assumed gap.
+#
+# The raw series is cut at 2020: after that NEDC declarations survive for a small
+# self-selected residue (5.9% of 2024 cars) and the column stops being informative.
+basis_long <- basis |>
+  transmute(build_year = year_new,
+            `op de weg (gat toegepast)`   = saving_realworld,
+            `typegoedkeuring, zonder gat` = saving_typeapproval,
+            `onbewerkte NEDC-opgave`      = ifelse(year_new <= 2020, saving_raw_nedc, NA)) |>
+  pivot_longer(-build_year, names_to = "reeks", values_to = "l") |>
+  filter(!is.na(l))
+
+p_basis <- cpb_line(basis_long, x = build_year, y = l, colour = reeks,
+  index = c(6, 2, 4),
+  value_limits = c(-0.9, 2.1),
+  title = "Dezelfde besparing, op drie grondslagen",
+  subtitle = "de dip zit ook in de onbewerkte opgave: de correcties maken hem dieper, niet echt",
+  ylab  = "liter per 100 km bespaard",
+  xlab  = "bouwjaar van de nieuwere auto") +
+  scale_x_year(from = 2005)
+
+fig(p_basis, "17_saving_by_basis")
+
 # ---- figure 15: how much of the fleet trend is the mix ------------------------
 
 # Holding the composition of types and sizes at its 2000 shares separates engine
@@ -134,6 +163,7 @@ fig(p_mix, "15_fixed_weight_composition")
 # ---- numbers for the write-up -------------------------------------------------
 
 sv <- function(yr, col) saving[[col]][saving$year_new == yr]
+bs <- function(yr, col) basis[[col]][basis$year_new == yr]
 pl <- function(yr, sid) by_size$mean_l_petrol[by_size$build_year == yr & by_size$size_id == sid]
 len_saving <- saving_len |>
   summarise(l = sum(saving_l_100km * vehicles_new) / sum(vehicles_new),
@@ -181,5 +211,16 @@ segment_facts <- list(
   petrol_mid_early = pct_change(pl(2000, 3), pl(2013, 3)),
   petrol_mid_late  = pct_change(pl(2013, 3), pl(2024, 3)),
   petrol_small_late = pct_change(pl(2013, 1), pl(2024, 1)),
-  petrol_big_late  = pct_change(pl(2013, 5), pl(2024, 5))
+  petrol_big_late  = pct_change(pl(2013, 5), pl(2024, 5)),
+
+  # Does the correction create the V? Compare bases at the turning points.
+  basis_2013_real  = bs(2013, "saving_realworld"),
+  basis_2013_ta    = bs(2013, "saving_typeapproval"),
+  basis_2013_raw   = bs(2013, "saving_raw_nedc"),
+  basis_2019_real  = bs(2019, "saving_realworld"),
+  basis_2019_ta    = bs(2019, "saving_typeapproval"),
+  basis_2019_raw   = bs(2019, "saving_raw_nedc"),
+  basis_2024_real  = bs(2024, "saving_realworld"),
+  basis_2024_ta    = bs(2024, "saving_typeapproval"),
+  basis_2024_nedc_cov = bs(2024, "pct_with_nedc_new")
 )

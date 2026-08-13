@@ -111,6 +111,14 @@ with(segment_facts, {
               petrol_mid_early, petrol_mid_late))
   cat(sprintf("  klein sinds 2013 %+.1f%%, zeer groot %+.1f%%\n",
               petrol_small_late, petrol_big_late))
+
+  cat("\nIs de V-vorm een artefact van de correcties?\n")
+  cat(sprintf("  %-6s %10s %10s %10s\n", "jaar", "op de weg", "typegdk.", "ruwe NEDC"))
+  cat(sprintf("  %-6d %10.2f %10.2f %10.2f\n", 2013, basis_2013_real, basis_2013_ta, basis_2013_raw))
+  cat(sprintf("  %-6d %10.2f %10.2f %10.2f\n", 2019, basis_2019_real, basis_2019_ta, basis_2019_raw))
+  cat(sprintf("  %-6d %10.2f %10.2f %10s\n", 2024, basis_2024_real, basis_2024_ta,
+              sprintf("(%.0f%% dekking)", basis_2024_nedc_cov)))
+  cat("  de dip zit ook in de ruwe opgave; het gat-model verdiept hem\n")
 })
 
 cat(sprintf("\nFiguren geschreven naar %s\n", FIG_DIR))
