@@ -7,6 +7,7 @@
 source("R/00_setup.R")
 source("R/01_fleet.R")
 source("R/02_efficiency.R")
+source("R/03_adjusted.R")
 
 # Dutch convention: "." groups thousands, "," is the decimal separator.
 fmt <- function(x) formatC(x, format = "d", big.mark = ".", decimal.mark = ",")
@@ -49,6 +50,39 @@ with(efficiency_facts, {
               diesel_2019, diesel_2024))
   cat(sprintf("  leeggewicht        %s -> %s kg: diesel trekt zich terug op zware auto's\n",
               fmt(diesel_mass_2019), fmt(diesel_mass_2024)))
+})
+
+cat("\nLike-for-like: een cyclus, op de weg, gelijk gewicht\n")
+cat(  "----------------------------------------------------\n")
+with(adjusted_facts, {
+  cat(sprintf("NEDC->WLTP factor    %.3f gepoold, geschat uit 1,41 mln gepaarde auto's\n", conv_pooled))
+  cat(sprintf("  benzine %.2f-%.2f, diesel %.2f-%.2f naar massaklasse\n",
+              conv_petrol_lo, conv_petrol_hi, conv_diesel_lo, conv_diesel_hi))
+  cat(sprintf("Typegoedkeuring      %.2f -> %.2f l/100km (%+.1f%%)\n",
+              ta_2000, ta_2024, ta_change))
+  cat(sprintf("Op de weg            %.2f -> %.2f l/100km (%+.1f%%)\n",
+              real_2000, real_2024, real_change))
+  cat(sprintf("  piek op de weg     %.2f l/100km in %d: het testgat groeide sneller\n",
+              real_peak, real_peak_year))
+  cat(sprintf("Hele park (elek.= 0) %.2f -> %.2f l/100km (%+.1f%%)\n",
+              real_2000, fleet_2024, fleet_change))
+  cat(sprintf("\nMassa-effect benzine (beta = %.4f l/100km per kg)\n", beta_petrol))
+  cat(sprintf("  gewicht            %.0f -> %.0f kg\n", petrol_mass_2000, petrol_mass_2024))
+  cat(sprintf("  werkelijk 2024     %.2f l/100km (%+.1f%% t.o.v. 2000)\n",
+              petrol_actual_24, petrol_change))
+  cat(sprintf("  bij gewicht 2000   %.2f l/100km (%+.1f%% t.o.v. 2000)\n",
+              petrol_cf_24, petrol_cf_change))
+  cat(sprintf("  kosten van zwaarder worden: %.2f l/100km\n", petrol_penalty24))
+  cat(sprintf("  (binnen benzine blijft het gewicht vrijwel gelijk: zware auto's\n"))
+  cat(sprintf("   verdwijnen naar hybride en elektrisch, niet uit het park)\n"))
+
+  cat(sprintf("\nMassa-effect alle verbrandingsmotoren (beta = %.4f l/100km per kg)\n", beta_fleet))
+  cat(sprintf("  gewicht            %.0f -> %.0f kg\n", fleet_mass_2000, fleet_mass_2024))
+  cat(sprintf("  werkelijk 2024     %.2f l/100km (%+.1f%% t.o.v. 2000)\n",
+              fleet_actual_24, fleet_cm_change))
+  cat(sprintf("  bij gewicht 2000   %.2f l/100km (%+.1f%% t.o.v. 2000)\n",
+              fleet_cf_24, fleet_cf_change))
+  cat(sprintf("  kosten van zwaarder worden: %.2f l/100km\n", fleet_penalty_24))
 })
 
 cat(sprintf("\nFiguren geschreven naar %s\n", FIG_DIR))

@@ -15,11 +15,10 @@ clone.
 
 ## Result in one line
 
-Type-approval CO2 for a Dutch passenger car fell from **180 to 119 g/km** between
-build years 2000 and 2019 on the NEDC cycle (−34%). Fleet-wide tailpipe CO2 fell
-from **190 to 71 g/km** (−62%) — but almost all of the post-2019 part of that is
-electrification, not engines: 30% of the 2024 vintage has no tailpipe at all,
-while a petrol car built in 2024 still emits 124 g/km against 144 in 2019.
+On a like-for-like basis — one measurement cycle, litres actually burned, constant
+kerb mass — fuel economy improved by **40%** between build years 2000 and 2024, not
+the **52%** the type-approval figures claim. The difference is a widening gap
+between laboratory and road, and cars getting heavier.
 
 ## Quick start
 
@@ -73,7 +72,30 @@ locally.
 
 ## Findings
 
-### Efficiency
+### Fuel economy, corrected
+
+Everything below is in litres per 100 km, on one cycle (WLTP-equivalent), for cars
+that burn fuel. Each row strips out one more distortion.
+
+| Basis | 2000 | 2024 | Change |
+|---|---|---|---|
+| Type approval | 9.43 | 4.54 | −52% |
+| …on the road | 8.57 | 6.09 | **−29%** |
+| …and at constant 2000 kerb mass | 8.57 | 5.17 | **−40%** |
+| Whole fleet, electric counted as 0 l | 8.57 | 4.04 | −53% |
+
+Read down the table: type approval claims a halving. Correcting to what cars
+actually burned cuts that to −29%, because the laboratory-to-road gap widened from
+9% to 40% over the NEDC era — improvement that existed on paper only. Holding kerb
+mass at its 2000 level restores it to −40%: about **0.9 l/100 km** of real
+engineering gain was spent carrying heavier cars rather than saving fuel.
+
+On-road consumption actually **rose** between 2013 and 2019, peaking at 7.67
+l/100 km, while the type-approval figure kept falling. The last row is the fleet
+including cars with no fuel tank; it returns to −53% only because 30% of the 2024
+vintage burns nothing.
+
+### Type-approval CO2
 
 | Series | From | To | Change |
 |---|---|---|---|
@@ -104,6 +126,73 @@ efficiency gain was spent on carrying more car, which is why
   (282,781 cars).
 - Powertrain split of the whole 2000-2024 fleet: petrol 71.3%, self-charging hybrid
   8.1%, diesel 7.7%, battery-electric 6.5%, plug-in hybrid 5.6%, LPG 0.7%.
+
+## The three corrections
+
+### 1. One measurement cycle, estimated not assumed
+
+The NEDC→WLTP switch splits the series in two. Rather than borrow a published
+scalar, the conversion is estimated from **1,411,000 cars that carry both
+declarations on the same registry record** — the same car, measured both ways
+(`sql/040_cycle_conversion.sql`). Factors are fitted per powertrain × kerb-mass
+band:
+
+| Powertrain | WLTP/NEDC ratio | Paired cars |
+|---|---|---|
+| Petrol | 1.157 – 1.204 (falling with mass) | 1,068,000 |
+| Diesel | 1.215 – 1.290 | 57,000 |
+| Self-charging hybrid | 1.178 – 1.286 | 265,000 |
+| Plug-in hybrid | 1.254 (pooled; cells too thin) | 113 |
+
+These pool to **1.204**. The European Commission's impact assessments assumed 21%,
+later confirmed by a JRC study — an independent check the estimate passes without
+having been fitted to it.
+
+The unavoidable assumption: factors estimated on 2018–2024 cars are applied back to
+cars built from 2000, which were never WLTP tested. A converted 2003 figure is an
+estimate of what WLTP would have said, not a measurement. 65% of the fleet carries
+a converted figure, 25% a measured one; `wltp_basis` flags which.
+
+### 2. Litres actually burned
+
+Type approval is a laboratory number, and the divergence from real driving is not
+constant — it grew through the NEDC era as test tolerances were exploited, then
+reset under WLTP. Two external sources, both in `sql/050_real_world.sql` where they
+can be replaced in one place:
+
+- **WLTP era** — European Commission, [COM(2024) 122 final](https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:52024DC0122),
+  Table 3, from OBFCM on-board monitoring of 617,194 cars registered in 2021:
+  petrol **+20.4%**, diesel **+16.7%**, plug-in hybrid **+267%**. The report notes
+  the gap is identical for CO2 and fuel consumption.
+- **NEDC era** — the same report puts the gap at "around 40%" by 2017 (citing JRC
+  28734 EN); ICCT put it near 9% in 2001. Intermediate years are linearly
+  interpolated, which is an approximation, not a sourced series.
+
+Converted cars are corrected off their own NEDC figure using that year's NEDC gap,
+*not* via the WLTP-equivalent. Going the other way would apply today's 20% gap to a
+2003 car and overstate it by a third — those cars broadly did meet their NEDC
+figure, which is precisely why the gap had room to grow.
+
+Plug-in hybrids take their own factor in every year: the divergence is driven by
+how often the car is actually plugged in, not by which cycle certified it.
+
+### 3. Constant kerb mass
+
+Cars gained 31% kerb mass over the period, so part of the engineering gain went
+into carrying more car. The counterfactual holds mass at its 2000 level using a
+consumption-per-kilogram slope identified *within* build year — a heavy against a
+light car of the same vintage, so engine technology is held fixed:
+
+    beta = sum_y n_y cov_y(litres, mass) / sum_y n_y var_y(mass)
+
+DuckDB computes the per-cell moments, R assembles the estimate, and 9.5M rows never
+enter R. The pooled combustion slope is **0.0033 l/100 km per kg**.
+
+One subtlety worth knowing: run this *within petrol only* and the correction nearly
+vanishes, because mean petrol kerb mass barely moved (1,111 → 1,119 kg). Every time
+a larger car electrified it left the petrol category and took its mass with it. The
+fleet-wide mass gain is largely that composition shift, so the correction is only
+meaningful with the powertrains pooled. Both are reported.
 
 ## Reading the numbers correctly
 
@@ -155,11 +244,16 @@ is ~90% for 2000-2005 vintages against ~99.8% today.
 | `efficiency_nedc_series` | Continuous NEDC-only series, no cycle break |
 | `efficiency_normalised` | CO2 per tonne and per kW |
 | `coverage_by_year` | Share of each vintage carrying a usable figure |
+| `cycle_conversion` | Estimated WLTP/NEDC factors per powertrain × mass band |
+| `fuel_economy_trend` | Type-approval and on-road l/100km per year × powertrain |
+| `fleet_fuel_trend` | Fleet l/100km, electric counted as zero litres |
+| `realworld_gap_nedc` / `realworld_gap_wltp` | The gap assumptions, as data |
+| `mass_regression_stats` | Within-year moments for the constant-mass correction |
 
 The 9.5M-row `vehicles` table stays in `data/fuelecon.duckdb`; query it directly for
 anything the aggregates do not cover.
 
-`R/run_analysis.R` writes seven figures to `output/figures/`. `docs/results.html`
+`R/run_analysis.R` writes eleven figures to `output/figures/`. `docs/results.html`
 presents them with the numbers and caveats; regenerate it with
 `python3 docs/build_page.py` after re-running the analysis.
 

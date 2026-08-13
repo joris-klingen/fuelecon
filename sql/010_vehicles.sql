@@ -156,6 +156,10 @@ SELECT
     -- Raw cycle-specific figures kept so a like-for-like NEDC-only series is possible.
     CASE WHEN f.l_100km_nedc BETWEEN 0.5 AND 40 THEN f.l_100km_nedc END AS l_100km_nedc,
     CASE WHEN f.l_100km_wltp BETWEEN 0.5 AND 40 THEN f.l_100km_wltp END AS l_100km_wltp,
+    -- Utility-factor weighted WLTP consumption: the figure a plug-in hybrid is
+    -- actually certified on. Null for everything else, so it coalesces away.
+    CASE WHEN f.l_100km_wltp_weighted BETWEEN 0.5 AND 40
+         THEN f.l_100km_wltp_weighted END                             AS l_100km_wltp_weighted,
     CASE WHEN f.co2_nedc BETWEEN 1 AND 700 THEN f.co2_nedc END          AS co2_nedc,
     CASE WHEN f.co2_wltp BETWEEN 1 AND 700 THEN f.co2_wltp END          AS co2_wltp
 FROM v

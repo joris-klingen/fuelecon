@@ -14,6 +14,36 @@ def img(name: str) -> str:
 
 FIGURES = [
     (
+        "08_typeapproval_vs_real",
+        "Combustion engines: what the test said, and what they burned",
+        "Everything converted to one cycle, then corrected to on-road litres. The "
+        "lines cross around 2007 and then separate. On-road consumption <em>rises</em> "
+        "from 2013 to 2019 while the type-approval figure keeps falling \u2014 the "
+        "laboratory-to-road gap was widening faster than the engines were improving.",
+    ),
+    (
+        "11_fleet_constant_mass",
+        "On-road consumption, actual and at constant 2000 kerb mass",
+        "The gap between the lines is what heavier cars cost. By 2024 it is 0.92 "
+        "l/100 km: real engineering gain that went into carrying more car rather "
+        "than into using less fuel.",
+    ),
+    (
+        "09_petrol_constant_mass",
+        "The same correction within petrol cars alone",
+        "Almost nothing happens, and that is the finding. Mean petrol kerb mass "
+        "barely moved across the period (1,111 to 1,119 kg), because every time a "
+        "larger car electrified it left the petrol category and took its mass with "
+        "it. The fleet-wide mass gain is mostly composition.",
+    ),
+    (
+        "10_fleet_real_fuel",
+        "Real fuel use per build year, whole fleet against combustion only",
+        "The lower line counts cars with no fuel tank as zero litres. The whole "
+        "fleet is back to 4.0 l/100 km not because engines improved after 2019 but "
+        "because a third of the vintage stopped burning anything.",
+    ),
+    (
         "01_fleet_by_year_powertrain",
         "Passenger cars in the current fleet, by build year and powertrain",
         "The shape on the left is survival, not sales. Every bar is what is still "
@@ -67,14 +97,11 @@ FIGURES = [
 ]
 
 NUMBERS = [
-    ("NEDC median CO2", "180 g/km", "2000", "119 g/km", "2019", "-34%", "down"),
-    ("NEDC median consumption", "7.4 l/100km", "2000", "5.0 l/100km", "2019", "-32%", "down"),
-    ("WLTP median CO2", "142 g/km", "2018", "114 g/km", "2024", "-20%", "down"),
-    ("Fleet mean tailpipe CO2", "190 g/km", "2000", "71 g/km", "2024", "-62%", "down"),
-    ("Petrol only, WLTP", "144 g/km", "2019", "124 g/km", "2024", "-14%", "down"),
-    ("Diesel only, WLTP", "156 g/km", "2019", "253 g/km", "2024", "+62%", "up"),
-    ("Mean kerb mass", "1,187 kg", "2000", "1,556 kg", "2024", "+31%", "up"),
-    ("Mean power", "88 kW", "2000", "104 kW", "2024", "+18%", "up"),
+    ("Type approval", "9.43 l/100km", "2000", "4.54 l/100km", "2024", "-52%", "down"),
+    ("\u2026on the road", "8.57 l/100km", "2000", "6.09 l/100km", "2024", "-29%", "down"),
+    ("\u2026at constant 2000 mass", "8.57 l/100km", "2000", "5.17 l/100km", "2024", "-40%", "down"),
+    ("Fleet, electric as 0 l", "8.57 l/100km", "2000", "4.04 l/100km", "2024", "-53%", "down"),
+    ("Mean kerb mass", "1,126 kg", "2000", "1,407 kg", "2024", "+25%", "up"),
 ]
 
 TRAPS = [
@@ -385,18 +412,20 @@ HTML = f"""<title>Nine Million Cars</title>
     <h1>Nine million cars</h1>
     <p class="standfirst">
       How much fuel efficiency actually improved in the Dutch passenger car fleet,
-      and how many of each car is left on the road. Every figure is drawn from the
-      full vehicle registry: 9.5 million cars joined to 16.9 million fuel and
-      emissions records.
+      and how many of each car is left on the road. Drawn from the full vehicle
+      registry &mdash; 9.5 million cars joined to 16.9 million fuel records &mdash;
+      and corrected onto a single basis so that a car from 2000 and a car from 2024
+      can be compared at all.
     </p>
     <div class="headline">
-      <span class="from">190</span>
+      <span class="from">-52%</span>
       <span class="arrow">&rarr;</span>
-      <span class="to">71</span>
-      <span class="unit">g CO2/km</span>
+      <span class="to">-40%</span>
+      <span class="unit">like for like</span>
       <span class="gloss">
-        Mean tailpipe CO2, build year 2000 against 2024 &mdash; a 62 percent fall.
-        Most of the drop after 2019 is electrification rather than better engines.
+        Type approval claims fuel economy halved between build years 2000 and 2024.
+        Corrected to one measurement cycle, litres actually burned, and constant
+        kerb mass, the improvement is 40 percent. The rest was the laboratory.
       </span>
     </div>
   </header>
@@ -426,12 +455,13 @@ HTML = f"""<title>Nine Million Cars</title>
   <section>
     <h2>The numbers</h2>
     <p class="section-lede">
-      Efficiency improved substantially, but the size of the improvement depends
-      entirely on what you hold fixed.
+      All in litres per 100 km, on one cycle, for cars that burn fuel. Each row
+      strips out one more distortion.
     </p>
     <div class="table-scroll">
       <table>
-        <caption>Type-approval figures from the RDW registry. Medians unless stated.</caption>
+        <caption>Fleet means over cars that burn fuel, except the last row.
+          Cycle conversion estimated from RDW; gap factors from COM(2024) 122.</caption>
         <thead>
           <tr>
             <th scope="col">Series</th>
@@ -447,13 +477,64 @@ HTML = f"""<title>Nine Million Cars</title>
     </div>
     <div class="prose" style="margin-top:2rem">
       <p>
-        Diesel is the row that looks wrong and is not. Its average rises because
-        diesel retreated to heavy vehicles: the mean kerb mass of a new diesel went
-        from 1,669 kg in 2019 to 2,538 kg in 2024. Over the same years the mean
-        petrol car got <em>lighter</em>, from 1,203 kg to 1,128 kg, as the larger
-        cars electrified. Neither series is a clean reading of engine development
-        on its own.
+        Read down the table. Type approval claims a halving. Correcting to what cars
+        actually burned cuts it to 29 percent, because the laboratory-to-road gap
+        widened from 9 percent to 40 percent over the NEDC era &mdash; improvement
+        that existed on paper only. Holding kerb mass at its 2000 level restores it
+        to 40 percent: roughly <strong>0.92 l/100 km</strong> of genuine engineering
+        gain went into carrying heavier cars instead of saving fuel.
       </p>
+      <p>
+        The last row is the whole fleet with electric cars entered at zero litres.
+        It returns to 53 percent only because 30 percent of the 2024 vintage burns
+        nothing at all.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>How the three corrections work</h2>
+    <p class="section-lede">
+      None of this is a black box. Each correction is either estimated from these
+      cars or sourced to a named document.
+    </p>
+    <div class="traps">
+      <div class="trap">
+        <h3>One cycle, estimated not assumed</h3>
+        <p>
+          1,411,000 cars carry both an NEDC and a WLTP declaration on the same
+          registry record &mdash; the same car, measured both ways. Factors are
+          fitted per powertrain and kerb-mass band: petrol 1.16&ndash;1.20, diesel
+          1.22&ndash;1.29. They pool to 1.204, against the European Commission's
+          assumed 21 percent, an independent check the estimate was not fitted to.
+        </p>
+      </div>
+      <div class="trap">
+        <h3>Litres actually burned</h3>
+        <p>
+          WLTP-era gaps come from Commission report COM(2024) 122, built on on-board
+          monitoring of 617,194 cars: petrol +20.4 percent, diesel +16.7 percent,
+          plug-in hybrid +267 percent. The NEDC-era gap runs from about 9 percent in
+          2001 to 40 percent by 2017.
+        </p>
+      </div>
+      <div class="trap">
+        <h3>Constant kerb mass</h3>
+        <p>
+          The consumption-per-kilogram slope is identified within build year &mdash;
+          a heavy against a light car of the same vintage, so engine technology is
+          held fixed. The pooled combustion slope is 0.0033 l/100 km per kg.
+        </p>
+      </div>
+      <div class="trap">
+        <h3>What is still assumed</h3>
+        <p>
+          Conversion factors estimated on 2018&ndash;2024 cars are applied back to
+          cars built from 2000, which were never WLTP tested. A converted 2003
+          figure is an estimate of what WLTP would have said, not a measurement.
+          65 percent of the fleet carries a converted figure.
+        </p>
+      </div>
     </div>
   </section>
 
@@ -496,8 +577,9 @@ Rscript R/run_analysis.R      # figures and headline numbers</code></pre>
   <footer>
     Source: <a href="https://opendata.rdw.nl">RDW open data</a>, datasets
     <code>m9d7-ebf2</code> and <code>8ys7-d773</code>, retrieved 13 August 2026.
-    Zero tailpipe emissions are zero at the tailpipe only; generation emissions sit
-    outside the registry's scope.
+    Real-world gap factors: European Commission, COM(2024) 122 final, 18.3.2024,
+    Table 3. Zero tailpipe emissions are zero at the tailpipe only; generation
+    emissions sit outside the registry's scope.
   </footer>
 
 </div>

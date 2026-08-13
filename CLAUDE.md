@@ -39,10 +39,32 @@ or plotting into SQL.
   `WHERE key > cursor ORDER BY key`. State is written after every page, so an
   interrupted download resumes.
 - `sql/0NN_*.sql` — run in filename order by `warehouse.build()`. `010` produces
-  the one-row-per-vehicle `vehicles` table; everything after it aggregates.
-- `R/00_setup.R` — shared labels, year axis, `fig()` export helper. `01_fleet.R`
-  and `02_efficiency.R` each build figures and a `*_facts` list that
-  `run_analysis.R` prints.
+  the one-row-per-vehicle `vehicles` table; `020`/`030` aggregate it; `040` puts
+  everything on one measurement cycle; `050` turns type approval into on-road
+  litres and emits the moments for the mass correction.
+- `R/00_setup.R` — shared labels, year axis, `fig()` export helper. `01_fleet.R`,
+  `02_efficiency.R` and `03_adjusted.R` each build figures and a `*_facts` list
+  that `run_analysis.R` prints.
+- `docs/build_page.py` — regenerates `docs/results.html` from `output/figures/`.
+
+## The three corrections
+
+`040` and `050` exist to make 2000 and 2024 comparable. Change them carefully.
+
+- **Cycle.** WLTP/NEDC factors are *estimated*, from 1.41M cars carrying both
+  declarations, per powertrain × mass band. Do not replace them with a scalar.
+  Exclude pairs where the two figures are byte-identical — that is one number
+  copied into both fields, and it is what produces the spurious 1.000 ratios in
+  pre-2018 vintages.
+- **Real-world gap.** Two external assumptions, both sourced in the header of
+  `050_real_world.sql` and materialised as tables (`realworld_gap_nedc`,
+  `realworld_gap_wltp`) so they can be swapped without touching logic. The NEDC
+  series is year-varying and that is load-bearing: applying today's WLTP gap to a
+  2003 car overstates it by a third.
+- **Mass.** The slope is a within-build-year estimator; pooling across years lets
+  the technology trend contaminate it. Compute moments in SQL, assemble in R.
+  Always use the pooled-powertrain version for fleet statements — within petrol
+  alone, mass is nearly flat because heavy cars electrified out of the category.
 
 ## Domain traps
 
