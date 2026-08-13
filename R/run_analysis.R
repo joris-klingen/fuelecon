@@ -10,6 +10,7 @@ source("R/02_efficiency.R")
 source("R/03_adjusted.R")
 source("R/04_segments.R")
 source("R/05_hedonic.R")
+source("R/06_model_index.R")
 
 # Dutch convention: "." groups thousands, "," is the decimal separator.
 fmt <- function(x) formatC(x, format = "d", big.mark = ".", decimal.mark = ",")
@@ -134,6 +135,23 @@ with(hedonic_facts, {
               n_years_worse, worst_year, worst_yoy))
   cat(sprintf("Vijf jaar jonger:    %.1f%% (2013), %.1f%% (2019), %.1f%% (2024)\n",
               five_2013, five_2019, five_2024))
+})
+
+cat("\nZelfde model, een jaar jonger (geketende modelindex)\n")
+cat(  "-----------------------------------------------------\n")
+with(model_facts, {
+  cat(sprintf("Per schakel %d-%d modellen gematcht\n", n_links_min, n_links_max))
+  cat(sprintf("Totale winst 2000-2024: %.1f%% (index %.1f)\n", total_gain, index_2024))
+  cat(sprintf("  alternatieve cyclusknip: index %.1f\n", alt_2024))
+  cat(sprintf("Zelfde specificatie ter vergelijking: index %.1f\n", hedonic_2024))
+  cat(sprintf("  wig van %.1f punten = modellen zijn zelf gegroeid\n", wedge))
+  cat(sprintf("Jaren waarin modellen slechter werden: %s\n", worst_run))
+  cat(sprintf("  in 2019 werden dezelfde modellen %+.0f kg zwaarder en %+.1f kW sterker\n",
+              mass_2019, power_2019))
+  cat(sprintf("Grondslagen verschillen: 2019 %+.1f%% (NEDC) vs %+.1f%% (WLTP)\n",
+              disagree_2019[1], disagree_2019[2]))
+  cat(sprintf("                         2021 %+.1f%% (NEDC) vs %+.1f%% (WLTP)\n",
+              disagree_2021[1], disagree_2021[2]))
 })
 
 cat(sprintf("\nFiguren geschreven naar %s\n", FIG_DIR))

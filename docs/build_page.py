@@ -23,6 +23,24 @@ FIGURES = [
         "length rather than mass bands; the two bracket the answer at 1.7 to 2.0.",
     ),
     (
+        "23_model_vs_hedonic",
+        "Two ways of asking the same question, and they agree",
+        "One index follows the nameplate through its generations, the other holds "
+        "size, power, fuel and body constant. They use entirely different "
+        "identifying variation and the matched-model line touches none of the "
+        "corrections, yet they finish within a point of each other at about 45 "
+        "percent. Until 2020 following a Golf delivered less than a constant "
+        "specification would have, because the Golf itself kept growing.",
+    ),
+    (
+        "22_model_histories",
+        "Five nameplates through time",
+        "The raw material behind the index, for a reader who would rather see cars "
+        "than an index. Each model against itself. All five improve sharply from "
+        "2008, flatten or worsen through the middle 2010s, and drop again as they "
+        "hybridise.",
+    ),
+    (
         "18_hedonic_index",
         "Efficiency at constant specification, 2000 = 100",
         "The cleanest answer in the set. Same size, power, fuel and body shape "

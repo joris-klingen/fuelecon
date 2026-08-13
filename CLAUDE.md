@@ -78,8 +78,13 @@ Before quoting any five-year saving, check `pct_measured_old` / `pct_measured_ne
 Only 2024-vs-2019 has both sides essentially measured on WLTP; earlier rows inherit
 the assumed NEDC gap ramp and are modelled, not measured.
 
-For any claim about *engines*, use the hedonic index in `070`/`R/05_hedonic.R`, not
-a segment mean. A segment is not a specification: inside one cell the hybrid share
+For any claim about *engines*, use the hedonic index (`070`) or the matched-model
+index (`080`), not a segment mean. The matched-model index is the one to reach for
+first: each link compares one model in two adjacent years on the same declaration,
+so it carries no conversion, splice or gap assumption at all. The two indices agree
+to within a point (46.4% against 45.3%), which is the project's strongest result.
+Note that NEDC declarations after 2018 are back-conversions and show systematically
+less improvement than WLTP in every overlap year; prefer WLTP links from 2019. A segment is not a specification: inside one cell the hybrid share
 swings 0-35-1-73% with Dutch tax policy and power drifts 7 kW. The index is
 estimated on raw declarations per cycle and chained over 2019-2020, so no cycle
 factor or gap assumption touches it.
