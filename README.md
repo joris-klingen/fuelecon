@@ -15,10 +15,11 @@ clone.
 
 ## Result in one line
 
-On a like-for-like basis — one measurement cycle, litres actually burned, constant
-kerb mass — fuel economy improved by **40%** between build years 2000 and 2024, not
-the **52%** the type-approval figures claim. The difference is a widening gap
-between laboratory and road, and cars getting heavier.
+Hold the car's specification fixed — same size, power, fuel and body — and fuel
+efficiency improved **45%** between build years 2000 and 2024, about **2.5% a
+year**, with a clear plateau from 2014 to 2019. Engines did not get worse in any
+year but two; the fleet-level numbers that suggest otherwise are composition and
+measurement, not engineering.
 
 ## Quick start
 
@@ -276,6 +277,51 @@ That last figure leans hard on one assumption: the Commission's +267% real-world
 correction for plug-in hybrids. If those cars are charged less than the OBFCM
 sample charged them, the saving is smaller.
 
+## The proper answer: same specification, one year newer
+
+A segment is not a specification. Inside one cell (hatchback, 1150–1350 kg) the
+hybrid share runs 0% → **35% in 2010** → 1% in 2016 → 73% in 2024, tracking Dutch
+tax incentives rather than technology; engine power drifts 91 → 98 kW over
+2014–2019 and back; diesel goes 13% → 0%. Those swings, not engine regression, are
+what the V-shape in figure 14 is mostly made of.
+
+So `sql/070_hedonic.sql` and `R/05_hedonic.R` hold the specification itself fixed:
+a regression of log fuel consumption on build-year dummies plus mass, power, fuel
+type and body type, over 20,117 cells. The year coefficients answer the question
+directly — **a car of identical size, power, fuel and shape, built a year later,
+uses how much less fuel?**
+
+Measurement is handled by splitting rather than converting. The regression is run
+twice on *raw* declarations, once per test cycle, and the two are chained over
+2019–2020 where both exist — the way a statistical agency splices an index. **No
+cycle factor and no real-world gap enters the trend at any point**, so this index
+is immune to the objection that the corrections drive the result. (The implied
+splice is 1.212, independently reproducing the 1.204 of step 040.)
+
+| | Quality-adjusted |
+|---|---|
+| Total improvement 2000 → 2024 | **45.3%** |
+| Average per year | **2.47%** |
+| 2001–2013 | 2.95% / year |
+| 2014–2024 | 1.91% / year |
+| Years that got worse | 2 of 24 (worst: 2019, +1.6%) |
+
+**Engines did not get worse.** At constant specification, efficiency improved in 22
+of 24 years. What did happen is a genuine *plateau* from 2014 to 2019 — five years
+newer bought 18.8% in 2013, 1.4% in 2019, and 15.5% again by 2024.
+
+So the answer to "how much do I save on a five-year-newer car" has two parts:
+
+- **Holding specification fixed** (figure 20): 15.5% today, near zero in 2019.
+- **As actually bought** (figure 14): ~20%, because buyers also switch to hybrids.
+
+The two nearly coincide today by coincidence — in 2019 they were 1.4% and −10.8%.
+
+One caveat on the plateau. NEDC figures for cars built after 2018 are not fresh lab
+tests; they were produced by back-conversion from WLTP. The 2014–2017 part of the
+plateau rests on genuine NEDC measurements, but its 2018–2020 tail and the chaining
+point inherit that derivation.
+
 ### Why size is proxied by kerb mass
 
 RDW records a length for only 53% of cars built before 2016 (98% by 2024), and the
@@ -346,11 +392,13 @@ is ~90% for 2000-2005 vintages against ~99.8% today.
 | `segment_saving_length` | The same on true length bands, 2016-2024 |
 | `fixed_weight_index` | Fleet consumption at the 2000 type and size mix |
 | `segment_saving_basis` | The saving on three bases, to test the corrections |
+| `hedonic_cells` / `hedonic_splice` | Cells and regime splice for the quality-adjusted index |
+| `hedonic_coverage` | Which cycle each build year can support |
 
 The 9.5M-row `vehicles` table stays in `data/fuelecon.duckdb`; query it directly for
 anything the aggregates do not cover.
 
-`R/run_analysis.R` writes seventeen figures to `output/figures/`. `docs/results.html`
+`R/run_analysis.R` writes twenty figures to `output/figures/`. `docs/results.html`
 presents them with the numbers and caveats; regenerate it with
 `python3 docs/build_page.py` after re-running the analysis.
 

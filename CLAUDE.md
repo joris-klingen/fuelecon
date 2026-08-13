@@ -78,6 +78,12 @@ Before quoting any five-year saving, check `pct_measured_old` / `pct_measured_ne
 Only 2024-vs-2019 has both sides essentially measured on WLTP; earlier rows inherit
 the assumed NEDC gap ramp and are modelled, not measured.
 
+For any claim about *engines*, use the hedonic index in `070`/`R/05_hedonic.R`, not
+a segment mean. A segment is not a specification: inside one cell the hybrid share
+swings 0-35-1-73% with Dutch tax policy and power drifts 7 kW. The index is
+estimated on raw declarations per cycle and chained over 2019-2020, so no cycle
+factor or gap assumption touches it.
+
 Hold size *and* powertrain fixed (`mean_l_petrol`) before claiming engine progress.
 Petrol cars of a given size have been flat since 2013 — the headline saving is
 almost entirely people buying hybrids, and in the heaviest band it rests on the

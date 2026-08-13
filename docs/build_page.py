@@ -23,6 +23,28 @@ FIGURES = [
         "length rather than mass bands; the two bracket the answer at 1.7 to 2.0.",
     ),
     (
+        "18_hedonic_index",
+        "Efficiency at constant specification, 2000 = 100",
+        "The cleanest answer in the set. Same size, power, fuel and body shape "
+        "throughout, estimated on raw declarations with no cycle conversion and no "
+        "gap correction anywhere in it. Efficiency improved 45 percent over the "
+        "period, about 2.5 percent a year \u2014 with an unmistakable plateau from "
+        "2014 to 2019.",
+    ),
+    (
+        "19_hedonic_year_on_year",
+        "The same index, year by year",
+        "Twenty-two of twenty-four years are improvements. Engines did not get "
+        "worse; only 2019 shows a clear step backwards, and it is small.",
+    ),
+    (
+        "20_hedonic_five_year",
+        "Five years newer, specification held fixed",
+        "Compare with the first figure, where the specification moves with the "
+        "buyer. Holding it fixed, five years of progress was worth 19 percent in "
+        "2013, almost nothing in 2019, and 15 percent again by 2024.",
+    ),
+    (
         "17_saving_by_basis",
         "The same saving computed three ways",
         "A check on whether the corrections manufactured the shape above. They did "

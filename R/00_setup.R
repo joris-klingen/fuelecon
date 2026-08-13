@@ -11,6 +11,7 @@ suppressPackageStartupMessages({
   library(dplyr)
   library(readr)
   library(tidyr)
+  library(tibble)
 })
 
 project_root <- function() {

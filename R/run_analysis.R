@@ -9,6 +9,7 @@ source("R/01_fleet.R")
 source("R/02_efficiency.R")
 source("R/03_adjusted.R")
 source("R/04_segments.R")
+source("R/05_hedonic.R")
 
 # Dutch convention: "." groups thousands, "," is the decimal separator.
 fmt <- function(x) formatC(x, format = "d", big.mark = ".", decimal.mark = ",")
@@ -119,6 +120,20 @@ with(segment_facts, {
   cat(sprintf("  %-6d %10.2f %10.2f %10s\n", 2024, basis_2024_real, basis_2024_ta,
               sprintf("(%.0f%% dekking)", basis_2024_nedc_cov)))
   cat("  de dip zit ook in de ruwe opgave; het gat-model verdiept hem\n")
+})
+
+cat("\nBij gelijke specificatie (gewicht, vermogen, brandstof, carrosserie)\n")
+cat(  "--------------------------------------------------------------------\n")
+with(hedonic_facts, {
+  cat(sprintf("Splice NEDC->WLTP    %.3f, uit %s auto's met beide opgaven\n",
+              splice_ratio, format(splice_n, big.mark = ".", decimal.mark = ",")))
+  cat(sprintf("Totale winst 2000-2024: %.1f%% zuiniger bij gelijke specificatie\n", total_gain))
+  cat(sprintf("Gemiddeld per jaar   %.2f%%  (2001-2013 %.2f%%, 2014-2024 %.2f%%)\n",
+              mean_yoy, mean_yoy_early, mean_yoy_late))
+  cat(sprintf("Jaren met verslechtering: %d van 24; slechtste %d (%+.1f%%)\n",
+              n_years_worse, worst_year, worst_yoy))
+  cat(sprintf("Vijf jaar jonger:    %.1f%% (2013), %.1f%% (2019), %.1f%% (2024)\n",
+              five_2013, five_2019, five_2024))
 })
 
 cat(sprintf("\nFiguren geschreven naar %s\n", FIG_DIR))
