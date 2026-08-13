@@ -8,6 +8,11 @@ Two questions:
 1. **How much did fuel efficiency improve** across build years 2000-2024?
 2. **How many of each car** are still present in the current fleet?
 
+**[Read the results page](https://claude.ai/code/artifact/f757c6cf-8711-419f-b8b8-1763015c9e09)** — all seven
+figures with the headline numbers and the caveats. Also checked in at
+[`docs/results.html`](docs/results.html), self-contained, openable straight from a
+clone.
+
 ## Result in one line
 
 Type-approval CO2 for a Dutch passenger car fell from **180 to 119 g/km** between
@@ -154,7 +159,9 @@ is ~90% for 2000-2005 vintages against ~99.8% today.
 The 9.5M-row `vehicles` table stays in `data/fuelecon.duckdb`; query it directly for
 anything the aggregates do not cover.
 
-`R/run_analysis.R` writes seven figures to `output/figures/`.
+`R/run_analysis.R` writes seven figures to `output/figures/`. `docs/results.html`
+presents them with the numbers and caveats; regenerate it with
+`python3 docs/build_page.py` after re-running the analysis.
 
 `data/` and `output/` are not committed — everything is reproducible from the two
 commands above.
