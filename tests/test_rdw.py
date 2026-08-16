@@ -23,6 +23,10 @@ def rows_dataset(tmp_path, monkeypatch):
         def state_path(self):
             return tmp_path / f"{self.key}.state.json"
 
+        @property
+        def lock_path(self):
+            return tmp_path / f"{self.key}.lock"
+
     return TmpDataset
 
 
@@ -194,6 +198,25 @@ def test_keyset_clause_expands_lexicographic_comparison():
     assert inclusive == "(a > '1') OR (a = '1' AND b >= '2')"
 
     assert rdw._keyset_clause(("a",), ["o'brien"], inclusive=False) == "(a > 'o''brien')"
+
+
+def test_second_download_of_the_same_dataset_is_refused(monkeypatch, rows_dataset, tmp_path):
+    """Two ingests appending to one CSV interleave their pages and double it.
+
+    Neither state file records the other's rows, so the corruption is invisible:
+    the Parquet is well formed and every count downstream is silently too high.
+    """
+    dataset = rows_dataset(
+        key="t", resource_id="x-y", title="test", columns=("kenteken", "value")
+    )
+    monkeypatch.setattr(rdw, "PAGE_SIZE", 100)
+    monkeypatch.setattr(rdw, "_fetch_page", fake_server([("K1", "v")], 100, False))
+
+    with rdw._exclusive(dataset), pytest.raises(RuntimeError, match="another ingest holds"):
+        rdw.download(dataset)
+
+    # The lock is released with the holder, so the next run proceeds normally.
+    assert rdw.download(dataset).complete
 
 
 def test_state_roundtrip(tmp_path):

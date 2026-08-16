@@ -75,6 +75,10 @@ class Dataset:
         return RAW_DIR / f"{self.key}.state.json"
 
     @property
+    def lock_path(self) -> Path:
+        return RAW_DIR / f"{self.key}.lock"
+
+    @property
     def parquet_path(self) -> Path:
         return PARQUET_DIR / f"{self.key}.parquet"
 

@@ -179,6 +179,15 @@ LEFT JOIN realworld_gap_nedc gn ON gn.build_year = p.build_year;
 -- car's WLTP figure and what it draws in Dutch conditions, but this repository has
 -- no sourced series for it, and inventing one here would put a fabricated number
 -- on exactly the side of the switch the research is about.
+--
+-- Nor is electricity put on one cycle. The factors in step 040 are estimated from
+-- paired CO2 declarations and say nothing about kilowatt hours, so an NEDC-era
+-- electric figure is left as it was measured and `cycle` says which it is. Read
+-- that column before comparing a 2015 battery car with a 2022 one.
+--
+-- The CNG unit is RDW's own and is not consistent across the cycle switch; CNG is
+-- well under a tenth of a per cent of these vintages, so it is carried rather than
+-- resolved. Check it before pricing those rows.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE TABLE vehicle_energy AS
 SELECT

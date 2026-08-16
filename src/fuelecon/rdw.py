@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import csv
+import fcntl
 import json
 import logging
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -108,6 +110,31 @@ def _split_page(text: str) -> tuple[str, list[str]]:
     return lines[0], [line for line in lines[1:] if line]
 
 
+@contextmanager
+def _exclusive(dataset: Dataset):
+    """Hold an exclusive lock on the dataset's lock file for the download.
+
+    Two ingests of the same dataset append to one CSV and each advance its own
+    cursor, so the file ends up with both processes' pages interleaved while the
+    state file records only one process's count. Nothing downstream notices: the
+    Parquet is well formed and every count is silently too high. flock is released
+    by the kernel when the holder exits, so a killed run leaves nothing to clean up.
+    """
+    dataset.lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with dataset.lock_path.open("w") as handle:
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as exc:
+            raise RuntimeError(
+                f"{dataset.key}: another ingest holds {dataset.lock_path}; "
+                "wait for it to finish rather than running two at once"
+            ) from exc
+        try:
+            yield
+        finally:
+            fcntl.flock(handle, fcntl.LOCK_UN)
+
+
 def _key_of(row: str, width: int = 1) -> list[str]:
     """The leading ``width`` CSV fields of a row, which are the ordering key.
 
@@ -129,7 +156,20 @@ def download(
 
     Returns the final state. ``max_pages`` caps the number of requests, which is how
     the smoke test pulls a usable slice without waiting for all 9.5M rows.
+
+    One download of a dataset at a time; a second one raises rather than queueing.
     """
+    with _exclusive(dataset):
+        return _download(dataset, max_pages=max_pages, force=force, app_token=app_token)
+
+
+def _download(
+    dataset: Dataset,
+    *,
+    max_pages: int | None,
+    force: bool,
+    app_token: str | None,
+) -> DownloadState:
     dataset.raw_path.parent.mkdir(parents=True, exist_ok=True)
 
     if force:
