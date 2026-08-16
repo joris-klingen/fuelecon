@@ -45,21 +45,21 @@ build_index <- function(switch_year, label) {
 }
 
 model_index <- bind_rows(
-  build_index(PRIMARY_SWITCH,     "WLTP vanaf 2019"),
-  build_index(ALTERNATIVE_SWITCH, "WLTP vanaf 2021")
+  build_index(PRIMARY_SWITCH,     "WLTP from 2019"),
+  build_index(ALTERNATIVE_SWITCH, "WLTP from 2021")
 )
 
-primary <- filter(model_index, variant == "WLTP vanaf 2019")
+primary <- filter(model_index, variant == "WLTP from 2019")
 
 # ---- figure 21: the matched-model index ---------------------------------------
 
 p_model <- cpb_line(model_index, x = build_year, y = index, colour = variant,
   index = c(6, 4),
   value_limits = c(40, 105),
-  title = "Verbruik van dezelfde modellen, bouwjaar 2000 = 100",
-  subtitle = "geketend per model; geen cyclusomrekening, geen gataanname",
-  ylab  = "index (lager = zuiniger)",
-  xlab  = "bouwjaar") +
+  title = "Consumption of the same models, build year 2000 = 100",
+  subtitle = "chained per model; no cycle conversion and no gap assumption",
+  ylab  = "index (lower is more economical)",
+  xlab  = "build year") +
   scale_x_year()
 
 fig(p_model, "21_matched_model_index")
@@ -81,15 +81,15 @@ PICK <- tribble(
 hist_plot <- histories |>
   inner_join(PICK, by = c("make", "model")) |>
   filter(!is.na(l_100km_nedc), build_year <= 2020) |>
-  mutate(naam = paste(tools::toTitleCase(tolower(make)),
+  mutate(name = paste(tools::toTitleCase(tolower(make)),
                       tools::toTitleCase(tolower(model))))
 
-p_hist <- cpb_line(hist_plot, x = build_year, y = l_100km_nedc, colour = naam,
+p_hist <- cpb_line(hist_plot, x = build_year, y = l_100km_nedc, colour = name,
   index = c(6, 5, 4, 2, 1),
-  title = "Vijf modellen door de tijd, NEDC-opgave",
-  subtitle = "elk model tegen zichzelf; reeks stopt waar de NEDC-opgave stopt",
-  ylab  = "liter per 100 km",
-  xlab  = "bouwjaar") +
+  title = "Five models through time, NEDC declaration",
+  subtitle = "each model against itself; series ends where the NEDC declaration does",
+  ylab  = "litres per 100 km",
+  xlab  = "build year") +
   scale_x_year(to = 2020)
 
 fig(p_hist, "22_model_histories")
@@ -103,17 +103,17 @@ fig(p_hist, "22_model_histories")
 # hybridisation is stripped out there, while a nameplate that goes hybrid keeps
 # the benefit. They finish within a point of each other.
 comparison <- bind_rows(
-  primary |> transmute(build_year, index, reeks = "zelfde model"),
-  hedonic_index |> transmute(build_year, index, reeks = "zelfde specificatie")
+  primary |> transmute(build_year, index, series = "same model"),
+  hedonic_index |> transmute(build_year, index, series = "same specification")
 )
 
-p_compare <- cpb_line(comparison, x = build_year, y = index, colour = reeks,
+p_compare <- cpb_line(comparison, x = build_year, y = index, colour = series,
   index = c(6, 2),
   value_limits = c(40, 105),
-  title = "Zelfde model versus zelfde specificatie",
-  subtitle = "modelgroei kostte winst tot 2020; daarna wint het model doordat het hybride werd",
-  ylab  = "index, 2000 = 100 (lager = zuiniger)",
-  xlab  = "bouwjaar") +
+  title = "Same model versus same specification",
+  subtitle = "model growth cost gains until 2020; after that the model gains by going hybrid",
+  ylab  = "index, 2000 = 100 (lower is more economical)",
+  xlab  = "build year") +
   scale_x_year()
 
 fig(p_compare, "23_model_vs_hedonic")
@@ -121,7 +121,7 @@ fig(p_compare, "23_model_vs_hedonic")
 # ---- numbers for the write-up -------------------------------------------------
 
 mi  <- function(yr) primary$index[primary$build_year == yr]
-alt <- function(yr) model_index$index[model_index$variant == "WLTP vanaf 2021" &
+alt <- function(yr) model_index$index[model_index$variant == "WLTP from 2021" &
                                       model_index$build_year == yr]
 lk  <- function(b, yr) links$pct_change[links$basis == b & links$build_year == yr]
 

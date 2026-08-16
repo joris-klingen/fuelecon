@@ -23,11 +23,11 @@
 
 CREATE OR REPLACE TABLE size_bands AS
 SELECT * FROM (VALUES
-    (1, 'klein (tot 950 kg)',        0,    950),
+    (1, 'small (under 950 kg)',      0,    950),
     (2, 'compact (950-1150 kg)',     950,  1150),
-    (3, 'middenklasse (1150-1350)',  1150, 1350),
-    (4, 'groot (1350-1600 kg)',      1350, 1600),
-    (5, 'zeer groot (1600 kg e.m.)', 1600, 100000)
+    (3, 'medium (1150-1350 kg)',     1150, 1350),
+    (4, 'large (1350-1600 kg)',      1350, 1600),
+    (5, 'very large (1600 kg+)',     1600, 100000)
 ) AS t(size_id, size_class, mass_min, mass_max);
 
 -- One row per vehicle with a type and a size attached.
@@ -49,12 +49,12 @@ SELECT
     -- the table under 'overig' and dropped from the figures.
     CASE v.body_type
         WHEN 'hatchback'    THEN 'hatchback'
-        WHEN 'stationwagen' THEN 'stationwagen'
+        WHEN 'stationwagen' THEN 'estate'
         WHEN 'MPV'          THEN 'MPV'
-        WHEN 'sedan'        THEN 'sedan'
-        WHEN 'coupe'        THEN 'coupe/cabriolet'
-        WHEN 'cabriolet'    THEN 'coupe/cabriolet'
-        ELSE 'overig'
+        WHEN 'sedan'        THEN 'saloon'
+        WHEN 'coupe'        THEN 'coupe/convertible'
+        WHEN 'cabriolet'    THEN 'coupe/convertible'
+        ELSE 'other'
     END                                                    AS car_type
 FROM vehicles_real r
 JOIN vehicles v USING (kenteken)
@@ -76,7 +76,7 @@ SELECT
     round(avg(l_100km_wltp_equiv), 3)                      AS mean_l_typeapproval,
     round(avg(kerb_mass_kg))                               AS mean_kerb_mass_kg
 FROM vehicles_segment
-WHERE car_type <> 'overig'
+WHERE car_type <> 'other'
 GROUP BY build_year, car_type
 HAVING count(*) >= 200
 ORDER BY build_year, car_type;
@@ -113,7 +113,7 @@ SELECT
     round(100.0 * count(*) FILTER (WHERE wltp_basis = 'measured') / count(*), 1)
                                                            AS pct_measured
 FROM vehicles_segment
-WHERE car_type <> 'overig' AND size_id IS NOT NULL
+WHERE car_type <> 'other' AND size_id IS NOT NULL
 GROUP BY build_year, car_type, size_id, size_class
 HAVING count(*) >= 200
 ORDER BY build_year, car_type, size_id;
@@ -179,16 +179,16 @@ WITH len AS (
         build_year,
         car_type,
         CASE
-            WHEN length_cm < 380 THEN '1 tot 380 cm'
+            WHEN length_cm < 380 THEN '1 under 380 cm'
             WHEN length_cm < 420 THEN '2 380-420 cm'
             WHEN length_cm < 450 THEN '3 420-450 cm'
             WHEN length_cm < 480 THEN '4 450-480 cm'
-            ELSE                      '5 480 cm en meer'
+            ELSE                      '5 480 cm and over'
         END                                                AS length_class,
         count(*)                                           AS vehicles,
         avg(l_100km_real)                                  AS mean_l_real
     FROM vehicles_segment
-    WHERE car_type <> 'overig'
+    WHERE car_type <> 'other'
       AND length_cm BETWEEN 250 AND 700
       AND build_year >= 2011
     GROUP BY ALL
@@ -269,7 +269,7 @@ WITH seg AS (
            avg(v.l_100km_nedc)                             AS l_nedc
     FROM vehicles_segment s
     JOIN vehicles v USING (kenteken)
-    WHERE s.car_type <> 'overig' AND s.size_id IS NOT NULL
+    WHERE s.car_type <> 'other' AND s.size_id IS NOT NULL
     GROUP BY ALL
     HAVING count(*) >= 200
 )

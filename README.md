@@ -8,8 +8,8 @@ Two questions:
 1. **How much did fuel efficiency improve** across build years 2000-2024?
 2. **How many of each car** are still present in the current fleet?
 
-**[Read the results page](https://claude.ai/code/artifact/f757c6cf-8711-419f-b8b8-1763015c9e09)** — all seven
-figures with the headline numbers and the caveats. Also checked in at
+**[Read the results page](https://claude.ai/code/artifact/f757c6cf-8711-419f-b8b8-1763015c9e09)** — a short
+note on what this means for the marginal cost of driving, with five figures. Also checked in at
 [`docs/results.html`](docs/results.html), self-contained, openable straight from a
 clone.
 

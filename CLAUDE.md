@@ -46,6 +46,9 @@ or plotting into SQL.
   `02_efficiency.R` and `03_adjusted.R` each build figures and a `*_facts` list
   that `run_analysis.R` prints.
 - `docs/build_page.py` — regenerates `docs/results.html` from `output/figures/`.
+  The page is deliberately short: five figures chosen for the marginal-cost-of-
+  driving question, an abstract, two tables and a limitations note. Adding figures
+  to it is a decision, not a default.
 
 ## The three corrections
 
@@ -116,7 +119,9 @@ sometimes as `0`, which is why casts are `TRY_CAST` with `nullif(..., 0)`.
 ## Conventions
 
 - Raw columns keep their Dutch RDW names; derived columns are English snake_case.
-- Figures and their labels are Dutch (CPB house style); code and comments English.
+- Everything user-facing is English: figure titles, axis labels, series names,
+  the console summary and `docs/results.html`. Class labels (size bands, body
+  types) are emitted in English by the SQL layer, not translated in R.
 - Everything is read from CSV as VARCHAR and cast once, explicitly, in `010`.
 - `data/` and `output/` are gitignored — reproducible, never committed.
 - Paths in DuckDB SQL are inlined via `sql_literal()`, not bound as parameters:

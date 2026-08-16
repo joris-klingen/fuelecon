@@ -80,10 +80,10 @@ hedonic_five_year <- hedonic_index |>
 p_index <- cpb_line(hedonic_index, x = build_year, y = index,
   index = 6,
   value_limits = c(50, 100),
-  title = "Zuinigheid bij gelijke specificatie, bouwjaar 2000 = 100",
-  subtitle = "gewicht, vermogen, brandstof en carrosserie constant; geen cyclusomrekening",
-  ylab  = "index (lager = zuiniger)",
-  xlab  = "bouwjaar") +
+  title = "Efficiency at constant specification, build year 2000 = 100",
+  subtitle = "mass, power, fuel and body held constant; no cycle conversion",
+  ylab  = "index (lower is more economical)",
+  xlab  = "build year") +
   scale_x_year()
 
 fig(p_index, "18_hedonic_index")
@@ -95,10 +95,10 @@ fig(p_index, "18_hedonic_index")
 p_yoy <- cpb_col(filter(hedonic_index, !is.na(yoy_pct)),
   x = build_year, y = yoy_pct,
   fill_colour = unname(cpb_cols(6)),
-  title = "Jaarlijkse verbetering bij gelijke specificatie",
-  subtitle = "negatief = zuiniger dan een verder identieke auto van een jaar eerder",
-  ylab  = "% verandering in verbruik",
-  xlab  = "bouwjaar") +
+  title = "Annual improvement at constant specification",
+  subtitle = "negative means more economical than an otherwise identical car a year older",
+  ylab  = "% change in consumption",
+  xlab  = "build year") +
   scale_x_continuous(breaks = seq(2000, 2024, 4))
 
 fig(p_yoy, "19_hedonic_year_on_year")
@@ -108,10 +108,10 @@ fig(p_yoy, "19_hedonic_year_on_year")
 p_five <- cpb_line(hedonic_five_year, x = build_year, y = saving_pct,
   index = 6,
   points = TRUE,
-  title = "Vijf jaar jonger, bij gelijke specificatie",
-  subtitle = "positief = zuiniger; vergelijk figuur 14, waar de specificatie meebeweegt",
-  ylab  = "% zuiniger dan vijf jaar eerder",
-  xlab  = "bouwjaar van de nieuwere auto") +
+  title = "Five years newer, at constant specification",
+  subtitle = "positive means more economical; compare the version where specification moves",
+  ylab  = "% more economical than five years earlier",
+  xlab  = "build year of the newer car") +
   scale_x_year(from = 2005)
 
 fig(p_five, "20_hedonic_five_year")

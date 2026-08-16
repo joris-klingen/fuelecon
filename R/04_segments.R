@@ -17,23 +17,23 @@ saving_len <- read_table("segment_saving_length")
 fixed_w    <- read_table("fixed_weight_index")
 basis      <- read_table("segment_saving_basis")
 
-CAR_TYPE_LEVELS <- c("hatchback", "stationwagen", "MPV", "sedan", "coupe/cabriolet")
+CAR_TYPE_LEVELS <- c("hatchback", "estate", "MPV", "saloon", "coupe/convertible")
 
 # ---- figure 12: consumption per build year, one line per car type -------------
 
 type_series <- by_type |>
   filter(car_type %in% CAR_TYPE_LEVELS) |>
-  mutate(carrosserie = factor(car_type, levels = CAR_TYPE_LEVELS))
+  mutate(body = factor(car_type, levels = CAR_TYPE_LEVELS))
 
-p_type <- cpb_line(type_series, x = build_year, y = mean_l_real, colour = carrosserie,
+p_type <- cpb_line(type_series, x = build_year, y = mean_l_real, colour = body,
   index = c(6, 5, 4, 2, 1),
   # Sedans reach 5.6 l/100km in 2024 and coupes 11.2; without explicit limits the
   # panel clips the bottom of the sedan line.
   value_limits = c(5, 11.5),
-  title = "Werkelijk verbruik per bouwjaar, naar carrosserie",
-  subtitle = "alleen verbrandingsmotoren; op de weg, niet de testwaarde",
-  ylab  = "liter per 100 km",
-  xlab  = "bouwjaar") +
+  title = "Real-world consumption by build year and body type",
+  subtitle = "combustion engines only; on the road, not the test figure",
+  ylab  = "litres per 100 km",
+  xlab  = "build year") +
   scale_x_year()
 
 fig(p_type, "12_consumption_by_car_type")
@@ -44,16 +44,16 @@ fig(p_type, "12_consumption_by_car_type")
 # consumed depending on when it was built. The lines are what someone comparing
 # like with like would actually face.
 size_series <- by_size |>
-  mutate(grootteklasse = factor(size_class,
-                                levels = unique(by_size$size_class[order(by_size$size_id)])))
+  mutate(size = factor(size_class,
+                       levels = unique(by_size$size_class[order(by_size$size_id)])))
 
-p_size <- cpb_line(size_series, x = build_year, y = mean_l_real, colour = grootteklasse,
+p_size <- cpb_line(size_series, x = build_year, y = mean_l_real, colour = size,
   index = c(1, 4, 6, 5, 2),
   value_limits = c(5, 13.6),
-  title = "Werkelijk verbruik per bouwjaar, naar grootteklasse",
-  subtitle = "zwaarste klasse duikt na 2020: dat is de komst van plug-in hybrides",
-  ylab  = "liter per 100 km",
-  xlab  = "bouwjaar") +
+  title = "Real-world consumption by build year and size class",
+  subtitle = "the heaviest class dives after 2020 as plug-in hybrids arrive",
+  ylab  = "litres per 100 km",
+  xlab  = "build year") +
   scale_x_year()
 
 fig(p_size, "13_consumption_by_size_class")
@@ -65,16 +65,16 @@ fig(p_size, "13_consumption_by_size_class")
 # Restricting to petrol removes that and leaves engine progress alone.
 size_petrol <- by_size |>
   filter(!is.na(mean_l_petrol)) |>
-  mutate(grootteklasse = factor(size_class,
-                                levels = unique(by_size$size_class[order(by_size$size_id)])))
+  mutate(size = factor(size_class,
+                       levels = unique(by_size$size_class[order(by_size$size_id)])))
 
 p_size_petrol <- cpb_line(size_petrol, x = build_year, y = mean_l_petrol,
-  colour = grootteklasse,
+  colour = size,
   index = c(1, 4, 6, 5, 2),
-  title = "Alleen benzineauto's: werkelijk verbruik naar grootteklasse",
-  subtitle = "aandrijving vastgehouden, zodat alleen motortechniek overblijft",
-  ylab  = "liter per 100 km",
-  xlab  = "bouwjaar") +
+  title = "Petrol cars only: real-world consumption by size class",
+  subtitle = "powertrain held fixed, so only engine technology remains",
+  ylab  = "litres per 100 km",
+  xlab  = "build year") +
   scale_x_year()
 
 fig(p_size_petrol, "16_petrol_by_size_class")
@@ -90,24 +90,24 @@ fig(p_size_petrol, "16_petrol_by_size_class")
 # whose older side is a converted NEDC figure inherit that assumption.
 saving_plot <- saving |>
   transmute(build_year = year_new,
-            reeks = "zelfde type en grootte (gewichtsklasse)",
+            series = "same body type and size (mass band)",
             l = saving_l_100km) |>
   bind_rows(
     saving_len |>
       summarise(l = sum(saving_l_100km * vehicles_new) / sum(vehicles_new),
                 .by = year_new) |>
       transmute(build_year = year_new,
-                reeks = "controle op werkelijke lengte",
+                series = "control on measured length",
                 l = round(l, 3))
   )
 
-p_saving <- cpb_line(saving_plot, x = build_year, y = l, colour = reeks,
+p_saving <- cpb_line(saving_plot, x = build_year, y = l, colour = series,
   index = c(6, 2),
   points = TRUE,
-  title = "Besparing bij vervanging door een vijf jaar jongere auto",
-  subtitle = "zelfde carrosserie en grootte; positief = de nieuwere auto is zuiniger",
-  ylab  = "liter per 100 km bespaard",
-  xlab  = "bouwjaar van de nieuwere auto") +
+  title = "Saving from replacing a car with one five years newer",
+  subtitle = "same body type and size; positive means the newer car is more economical",
+  ylab  = "litres per 100 km saved",
+  xlab  = "build year of the newer car") +
   scale_x_year(from = 2005)
 
 fig(p_saving, "14_five_year_replacement_saving")
@@ -123,19 +123,19 @@ fig(p_saving, "14_five_year_replacement_saving")
 # self-selected residue (5.9% of 2024 cars) and the column stops being informative.
 basis_long <- basis |>
   transmute(build_year = year_new,
-            `op de weg (gat toegepast)`   = saving_realworld,
-            `typegoedkeuring, zonder gat` = saving_typeapproval,
-            `onbewerkte NEDC-opgave`      = ifelse(year_new <= 2020, saving_raw_nedc, NA)) |>
-  pivot_longer(-build_year, names_to = "reeks", values_to = "l") |>
+            `on the road (gap applied)`    = saving_realworld,
+            `type approval, no gap`        = saving_typeapproval,
+            `raw NEDC declaration`         = ifelse(year_new <= 2020, saving_raw_nedc, NA)) |>
+  pivot_longer(-build_year, names_to = "series", values_to = "l") |>
   filter(!is.na(l))
 
-p_basis <- cpb_line(basis_long, x = build_year, y = l, colour = reeks,
+p_basis <- cpb_line(basis_long, x = build_year, y = l, colour = series,
   index = c(6, 2, 4),
   value_limits = c(-0.9, 2.1),
-  title = "Dezelfde besparing, op drie grondslagen",
-  subtitle = "de dip zit ook in de onbewerkte opgave: de correcties maken hem dieper, niet echt",
-  ylab  = "liter per 100 km bespaard",
-  xlab  = "bouwjaar van de nieuwere auto") +
+  title = "The same saving on three bases",
+  subtitle = "the dip is present in the raw declaration: the corrections deepen it, not create it",
+  ylab  = "litres per 100 km saved",
+  xlab  = "build year of the newer car") +
   scale_x_year(from = 2005)
 
 fig(p_basis, "17_saving_by_basis")
@@ -146,16 +146,16 @@ fig(p_basis, "17_saving_by_basis")
 # progress from people buying different cars.
 mix <- fixed_w |>
   select(build_year,
-         `werkelijke samenstelling` = l_actual,
-         `samenstelling van 2000`   = l_fixed_weight_2000) |>
-  pivot_longer(-build_year, names_to = "reeks", values_to = "l")
+         `actual composition`   = l_actual,
+         `2000 composition`     = l_fixed_weight_2000) |>
+  pivot_longer(-build_year, names_to = "series", values_to = "l")
 
-p_mix <- cpb_line(mix, x = build_year, y = l, colour = reeks,
+p_mix <- cpb_line(mix, x = build_year, y = l, colour = series,
   index = c(6, 2),
-  title = "Verbruik bij werkelijke en bij vastgehouden samenstelling",
-  subtitle = "vastgehouden op de type- en grootteverdeling van bouwjaar 2000",
-  ylab  = "liter per 100 km",
-  xlab  = "bouwjaar") +
+  title = "Consumption at actual and at fixed composition",
+  subtitle = "held at the body-type and size-class shares of build year 2000",
+  ylab  = "litres per 100 km",
+  xlab  = "build year") +
   scale_x_year()
 
 fig(p_mix, "15_fixed_weight_composition")

@@ -12,146 +12,72 @@ source("R/04_segments.R")
 source("R/05_hedonic.R")
 source("R/06_model_index.R")
 
-# Dutch convention: "." groups thousands, "," is the decimal separator.
-fmt <- function(x) formatC(x, format = "d", big.mark = ".", decimal.mark = ",")
+fmt <- function(x) formatC(x, format = "d", big.mark = ",")
 
-cat("\n")
-cat("Nederlandse personenauto's, bouwjaren 2000-2024\n")
-cat("===============================================\n\n")
+rule <- function(title) {
+  cat("\n", title, "\n", strrep("-", nchar(title)), "\n", sep = "")
+}
 
+cat("\nDutch passenger cars, build years 2000-2024\n")
+cat("===========================================\n")
+
+rule("Fleet")
 with(fleet_facts, {
-  cat(sprintf("Wagenpark            %s auto's in het huidige register\n", fmt(total)))
-  cat(sprintf("Grootste bouwjaar    %d (%s auto's nog geregistreerd)\n", peak_year, fmt(peak_vehicles)))
-  cat(sprintf("Bouwjaar <= 2009     %.1f%% van het park\n", share_pre_2010))
-  cat(sprintf("Grootste merk        %s (%.1f%%)\n", top_make, top_make_share))
-  cat(sprintf("Grootste model       %s (%s auto's)\n", top_model, fmt(top_model_n)))
-  cat(sprintf("Leeggewicht          %s kg (2000) -> %s kg (2024), %+.0f%%\n",
+  cat(sprintf("Registered now       %s cars\n", fmt(total)))
+  cat(sprintf("Largest vintage      %d (%s still registered)\n", peak_year, fmt(peak_vehicles)))
+  cat(sprintf("Built 2000-2009      %.1f%% of the fleet\n", share_pre_2010))
+  cat(sprintf("Largest make         %s (%.1f%%)\n", top_make, top_make_share))
+  cat(sprintf("Largest model        %s (%s cars)\n", top_model, fmt(top_model_n)))
+  cat(sprintf("Kerb mass            %s -> %s kg (%+.0f%%)\n",
               fmt(mass_2000), fmt(mass_2024), 100 * (mass_2024 - mass_2000) / mass_2000))
-  cat(sprintf("Vermogen             %.0f kW (2000) -> %.0f kW (2024), %+.0f%%\n",
+  cat(sprintf("Power                %.0f -> %.0f kW (%+.0f%%)\n",
               power_2000, power_2024, 100 * (power_2024 - power_2000) / power_2000))
 })
 
-cat("\nZuinigheid\n----------\n")
+rule("Type-approval CO2")
 with(efficiency_facts, {
-  cat(sprintf("NEDC %d-%d        %.0f -> %.0f g/km mediaan (%+.1f%%)\n",
+  cat(sprintf("NEDC %d-%d       %.0f -> %.0f g/km median (%+.1f%%)\n",
               nedc_first, nedc_last, nedc_co2_first, nedc_co2_last, nedc_change))
-  cat(sprintf("                     %.1f -> %.1f l/100km mediaan\n", nedc_l_first, nedc_l_last))
-  cat(sprintf("WLTP %d-2024      %.0f -> %.0f g/km mediaan (%+.1f%%)\n",
+  cat(sprintf("WLTP %d-2024       %.0f -> %.0f g/km median (%+.1f%%)\n",
               wltp_first, wltp_co2_first, wltp_co2_2024, wltp_change))
-  cat(sprintf("Uitlaat-CO2 park     %.0f (2000) -> %.0f g/km (2024), %+.1f%%\n",
+  cat(sprintf("Fleet tailpipe CO2   %.0f -> %.0f g/km (%+.1f%%)\n",
               fleet_co2_2000, fleet_co2_2024, fleet_change))
-  cat(sprintf("  verbrandingsmotor  %.0f (2019) -> %.0f g/km (2024)\n",
-              comb_co2_2019, comb_co2_2024))
-  cat(sprintf("Nul-uitstoot 2024    %.1f%% van het bouwjaar\n\n", zero_share_2024))
-
-  # Not the same statement as the fleet line: these hold the powertrain fixed.
-  cat(sprintf("Benzine WLTP         %.0f (2019) -> %.0f g/km (2024), %+.1f%%\n",
-              petrol_2019, petrol_2024, petrol_change))
-  cat(sprintf("  leeggewicht        %s -> %s kg: de resterende benzineauto wordt kleiner\n",
-              fmt(petrol_mass_2019), fmt(petrol_mass_2024)))
-  cat(sprintf("Diesel WLTP          %.0f (2019) -> %.0f g/km (2024): stijgt\n",
-              diesel_2019, diesel_2024))
-  cat(sprintf("  leeggewicht        %s -> %s kg: diesel trekt zich terug op zware auto's\n",
-              fmt(diesel_mass_2019), fmt(diesel_mass_2024)))
+  cat(sprintf("Zero-tailpipe 2024   %.1f%% of the vintage\n", zero_share_2024))
 })
 
-cat("\nLike-for-like: een cyclus, op de weg, gelijk gewicht\n")
-cat(  "----------------------------------------------------\n")
+rule("Fuel economy, corrected")
 with(adjusted_facts, {
-  cat(sprintf("NEDC->WLTP factor    %.3f gepoold, geschat uit 1,41 mln gepaarde auto's\n", conv_pooled))
-  cat(sprintf("  benzine %.2f-%.2f, diesel %.2f-%.2f naar massaklasse\n",
-              conv_petrol_lo, conv_petrol_hi, conv_diesel_lo, conv_diesel_hi))
-  cat(sprintf("Typegoedkeuring      %.2f -> %.2f l/100km (%+.1f%%)\n",
-              ta_2000, ta_2024, ta_change))
-  cat(sprintf("Op de weg            %.2f -> %.2f l/100km (%+.1f%%)\n",
+  cat(sprintf("NEDC->WLTP factor    %.3f pooled, from 1.41M paired cars\n", conv_pooled))
+  cat(sprintf("Type approval        %.2f -> %.2f l/100km (%+.1f%%)\n", ta_2000, ta_2024, ta_change))
+  cat(sprintf("On the road          %.2f -> %.2f l/100km (%+.1f%%)\n",
               real_2000, real_2024, real_change))
-  cat(sprintf("  piek op de weg     %.2f l/100km in %d: het testgat groeide sneller\n",
+  cat(sprintf("  peak on the road   %.2f l/100km in %d: the test gap grew faster\n",
               real_peak, real_peak_year))
-  cat(sprintf("Hele park (elek.= 0) %.2f -> %.2f l/100km (%+.1f%%)\n",
+  cat(sprintf("Fleet (electric = 0) %.2f -> %.2f l/100km (%+.1f%%)\n",
               real_2000, fleet_2024, fleet_change))
-  cat(sprintf("\nMassa-effect benzine (beta = %.4f l/100km per kg)\n", beta_petrol))
-  cat(sprintf("  gewicht            %.0f -> %.0f kg\n", petrol_mass_2000, petrol_mass_2024))
-  cat(sprintf("  werkelijk 2024     %.2f l/100km (%+.1f%% t.o.v. 2000)\n",
-              petrol_actual_24, petrol_change))
-  cat(sprintf("  bij gewicht 2000   %.2f l/100km (%+.1f%% t.o.v. 2000)\n",
-              petrol_cf_24, petrol_cf_change))
-  cat(sprintf("  kosten van zwaarder worden: %.2f l/100km\n", petrol_penalty24))
-  cat(sprintf("  (binnen benzine blijft het gewicht vrijwel gelijk: zware auto's\n"))
-  cat(sprintf("   verdwijnen naar hybride en elektrisch, niet uit het park)\n"))
-
-  cat(sprintf("\nMassa-effect alle verbrandingsmotoren (beta = %.4f l/100km per kg)\n", beta_fleet))
-  cat(sprintf("  gewicht            %.0f -> %.0f kg\n", fleet_mass_2000, fleet_mass_2024))
-  cat(sprintf("  werkelijk 2024     %.2f l/100km (%+.1f%% t.o.v. 2000)\n",
-              fleet_actual_24, fleet_cm_change))
-  cat(sprintf("  bij gewicht 2000   %.2f l/100km (%+.1f%% t.o.v. 2000)\n",
-              fleet_cf_24, fleet_cf_change))
-  cat(sprintf("  kosten van zwaarder worden: %.2f l/100km\n", fleet_penalty_24))
+  cat(sprintf("At 2000 kerb mass    %.2f l/100km (%+.1f%%); mass cost %.2f l/100km\n",
+              fleet_cf_24, fleet_cf_change, fleet_penalty_24))
 })
 
-cat("\nZelfde auto, vijf jaar jonger\n")
-cat(  "-----------------------------\n")
+rule("Replacing a car with one five years newer")
 with(segment_facts, {
-  cat(sprintf("Bouwjaar 2024 t.o.v. 2019, zelfde carrosserie en grootteklasse:\n"))
-  cat(sprintf("  %.2f -> %.2f l/100km, besparing %.2f l/100km (%.1f%%)\n",
+  cat(sprintf("2024 against 2019    %.2f -> %.2f l/100km, saving %.2f (%.1f%%)\n",
               save_2024_old, save_2024_new, save_2024, save_2024_pct))
-  cat(sprintf("  beide kanten %.0f%% resp. %.0f%% gemeten op WLTP: schone vergelijking\n",
-              save_2024_meas_o, save_2024_meas_n))
-  cat(sprintf("  controle op werkelijke lengte: %.2f l/100km (%.1f%%)\n",
-              save_2024_len, save_2024_lenpct))
-  cat(sprintf("Slechtste bouwjaar om te kopen: %d (%.2f l/100km, dus duurder dan\n",
-              worst_year, worst_saving))
-  cat(sprintf("  de vijf jaar oudere auto van hetzelfde formaat)\n"))
-  cat(sprintf("Beste vroege jaar: %d (%.2f l/100km bespaard)\n", best_early_year, best_early))
-  cat(sprintf("\nSamenstellingseffect: bij de type- en grootteverdeling van 2000\n"))
-  cat(sprintf("  zou 2024 op %.2f l/100km liggen i.p.v. %.2f (%.2f l/100km verschil)\n",
-              fixed_2024, actual_2024, mix_2024))
-
-  cat("\nGrootte EN aandrijving vastgehouden (benzine, middenklasse):\n")
-  cat(sprintf("  %.2f (2000) -> %.2f (2013) -> %.2f l/100km (2024)\n",
-              petrol_mid_2000, petrol_mid_2013, petrol_mid_2024))
-  cat(sprintf("  %+.1f%% tot 2013, daarna %+.1f%%: de motor staat sinds 2013 stil\n",
-              petrol_mid_early, petrol_mid_late))
-  cat(sprintf("  klein sinds 2013 %+.1f%%, zeer groot %+.1f%%\n",
+  cat(sprintf("  length-based check %.2f l/100km (%.1f%%)\n", save_2024_len, save_2024_lenpct))
+  cat(sprintf("Worst year to buy    %d (%.2f l/100km)\n", worst_year, worst_saving))
+  cat(sprintf("Petrol, same size    %+.1f%% (small) and %+.1f%% (very large) since 2013\n",
               petrol_small_late, petrol_big_late))
-
-  cat("\nIs de V-vorm een artefact van de correcties?\n")
-  cat(sprintf("  %-6s %10s %10s %10s\n", "jaar", "op de weg", "typegdk.", "ruwe NEDC"))
-  cat(sprintf("  %-6d %10.2f %10.2f %10.2f\n", 2013, basis_2013_real, basis_2013_ta, basis_2013_raw))
-  cat(sprintf("  %-6d %10.2f %10.2f %10.2f\n", 2019, basis_2019_real, basis_2019_ta, basis_2019_raw))
-  cat(sprintf("  %-6d %10.2f %10.2f %10s\n", 2024, basis_2024_real, basis_2024_ta,
-              sprintf("(%.0f%% dekking)", basis_2024_nedc_cov)))
-  cat("  de dip zit ook in de ruwe opgave; het gat-model verdiept hem\n")
 })
 
-cat("\nBij gelijke specificatie (gewicht, vermogen, brandstof, carrosserie)\n")
-cat(  "--------------------------------------------------------------------\n")
-with(hedonic_facts, {
-  cat(sprintf("Splice NEDC->WLTP    %.3f, uit %s auto's met beide opgaven\n",
-              splice_ratio, format(splice_n, big.mark = ".", decimal.mark = ",")))
-  cat(sprintf("Totale winst 2000-2024: %.1f%% zuiniger bij gelijke specificatie\n", total_gain))
-  cat(sprintf("Gemiddeld per jaar   %.2f%%  (2001-2013 %.2f%%, 2014-2024 %.2f%%)\n",
-              mean_yoy, mean_yoy_early, mean_yoy_late))
-  cat(sprintf("Jaren met verslechtering: %d van 24; slechtste %d (%+.1f%%)\n",
-              n_years_worse, worst_year, worst_yoy))
-  cat(sprintf("Vijf jaar jonger:    %.1f%% (2013), %.1f%% (2019), %.1f%% (2024)\n",
-              five_2013, five_2019, five_2024))
-})
+rule("Quality-adjusted indices, 2000 = 100")
+cat(sprintf("Same specification   %.1f  (%.1f%% more efficient, %.2f%%/year)\n",
+            hedonic_facts$index_2024, hedonic_facts$total_gain, hedonic_facts$mean_yoy))
+cat(sprintf("Same model           %.1f  (%.1f%% more efficient)\n",
+            model_facts$index_2024, model_facts$total_gain))
+cat(sprintf("  alternative cut    %.1f\n", model_facts$alt_2024))
+cat(sprintf("Years that got worse %d of 24 (specification), %s (models)\n",
+            hedonic_facts$n_years_worse, model_facts$worst_run))
+cat(sprintf("Five years newer     %.1f%% (2013), %.1f%% (2019), %.1f%% (2024)\n",
+            hedonic_facts$five_2013, hedonic_facts$five_2019, hedonic_facts$five_2024))
 
-cat("\nZelfde model, een jaar jonger (geketende modelindex)\n")
-cat(  "-----------------------------------------------------\n")
-with(model_facts, {
-  cat(sprintf("Per schakel %d-%d modellen gematcht\n", n_links_min, n_links_max))
-  cat(sprintf("Totale winst 2000-2024: %.1f%% (index %.1f)\n", total_gain, index_2024))
-  cat(sprintf("  alternatieve cyclusknip: index %.1f\n", alt_2024))
-  cat(sprintf("Zelfde specificatie ter vergelijking: index %.1f\n", hedonic_2024))
-  cat(sprintf("  wig van %.1f punten = modellen zijn zelf gegroeid\n", wedge))
-  cat(sprintf("Jaren waarin modellen slechter werden: %s\n", worst_run))
-  cat(sprintf("  in 2019 werden dezelfde modellen %+.0f kg zwaarder en %+.1f kW sterker\n",
-              mass_2019, power_2019))
-  cat(sprintf("Grondslagen verschillen: 2019 %+.1f%% (NEDC) vs %+.1f%% (WLTP)\n",
-              disagree_2019[1], disagree_2019[2]))
-  cat(sprintf("                         2021 %+.1f%% (NEDC) vs %+.1f%% (WLTP)\n",
-              disagree_2021[1], disagree_2021[2]))
-})
-
-cat(sprintf("\nFiguren geschreven naar %s\n", FIG_DIR))
+cat(sprintf("\nFigures written to %s\n", FIG_DIR))
