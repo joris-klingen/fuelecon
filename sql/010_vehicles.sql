@@ -65,7 +65,7 @@ f AS (
         -- co2_g_km chains below, which the whole fleet series rests on; sql/060
         -- picks them up where a per-car figure is what is wanted.
         max(TRY_CAST(brandstofverbruik_gewogen_gecombineerd AS DOUBLE)) AS l_100km_nedc_weighted,
-        max(TRY_CAST(elektriciteitsverbruik_gewogen_gecombineerd AS DOUBLE))
+        max(TRY_CAST(elektriciteitsverbruik_gewogen_gecombineerd AS DOUBLE)) / 10
                                                                        AS kwh_100km_nedc_weighted,
 
         -- WLTP declarations. "gewogen" (weighted) variants are the utility-factor
@@ -75,10 +75,15 @@ f AS (
         max(TRY_CAST(emissie_co2_gecombineerd_wltp AS DOUBLE))         AS co2_wltp,
         max(TRY_CAST(emis_co2_gewogen_gecombineerd_wltp AS DOUBLE))    AS co2_wltp_weighted,
 
-        -- Electric side.
-        max(TRY_CAST(elektrisch_verbruik_enkel_elektrisch_wltp AS DOUBLE))   AS kwh_100km_bev_wltp,
-        max(TRY_CAST(elektrisch_verbruik_extern_opladen_wltp AS DOUBLE))     AS kwh_100km_ovc_wltp,
-        max(TRY_CAST(elektriciteitsverbruik_volledig_elektrisch AS DOUBLE))  AS kwh_100km_bev,
+        -- Electric side. RDW declares electricity in Wh/km, not kWh/100 km, so
+        -- every one of these is ten times the number the column name suggests: the
+        -- median battery car reads 162, meaning 16.2 kWh/100 km. Divided here, once,
+        -- so the BETWEEN 5 AND 60 bound further down is in the unit it assumes.
+        -- (Before this, that bound discarded 619,374 of 619,375 battery cars and
+        -- median_kwh_100km came out empty in every exported table.)
+        max(TRY_CAST(elektrisch_verbruik_enkel_elektrisch_wltp AS DOUBLE)) / 10  AS kwh_100km_bev_wltp,
+        max(TRY_CAST(elektrisch_verbruik_extern_opladen_wltp AS DOUBLE)) / 10    AS kwh_100km_ovc_wltp,
+        max(TRY_CAST(elektriciteitsverbruik_volledig_elektrisch AS DOUBLE)) / 10 AS kwh_100km_bev,
         max(TRY_CAST(actie_radius_enkel_elektrisch_wltp AS DOUBLE))          AS ev_range_km,
         -- Externally charged range: the denominator of any utility factor, and so
         -- of any statement about what a plug-in hybrid costs to drive.

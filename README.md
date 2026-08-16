@@ -249,7 +249,15 @@ the licence plate does not hold:
 
 One row per licence plate per energy carrier — petrol, diesel, LPG, CNG,
 electricity — so attaching a price series is a join rather than a rewrite of the
-arithmetic per powertrain combination. Each row says where its figure came from:
+arithmetic per powertrain combination.
+
+The grain is the *fuel row*, not the car, and that matters: 25,493 of the 57,534
+LPG cars here declare a different figure for petrol than for gas. One reads 6.80
+l/100 km on LPG and 5.10 on petrol. Reducing that to one number per car picks
+whichever is larger and labels it with whichever fuel the classifier preferred, so
+the car ends up with one carrier, the wrong figure, and the wrong price.
+
+Each row says where its figure came from:
 
 | `basis` | Meaning |
 |---|---|
@@ -260,9 +268,11 @@ arithmetic per powertrain combination. Each row says where its figure came from:
 | `none` | The car uses this carrier and no figure was found |
 
 The `_variant` rows are what the chain buys: plates whose own fuel record is blank.
-Rows are emitted even when the figure is missing, so a price join returns a null
-cost rather than dropping the car. `energy_coverage_by_year` reports the mix per
-vintage, and `variant_match_quality` reports how well the chain held.
+For the electricity of 2021 vintages that is a third of all cars, and it cuts the
+share with no figure at all from 43% to 10%. Rows are emitted even when the figure
+is missing, so a price join returns a null cost rather than dropping the car.
+`energy_coverage_by_year` reports the mix per vintage, and `variant_match_quality`
+reports how well the chain held.
 
 Two things this table deliberately does not do. It does not apply the constant-mass
 counterfactual, which answers a fleet question and says nothing about what a
@@ -270,6 +280,19 @@ specific car costs its owner. And it puts no on-road correction on electricity:
 there is a real gap between a battery car's WLTP figure and what it draws in Dutch
 conditions, but no sourced series for it here, and a fabricated one would land on
 exactly the side of the comparison that matters.
+
+### One unit bug, fixed on the way
+
+RDW declares electricity in **Wh/km** while everything else is per 100 km, so every
+electric field is ten times what its name suggests — the median battery car reads
+162, meaning 16.2 kWh/100 km. The existing `BETWEEN 5 AND 60` sanity bound on
+`kwh_100km` therefore discarded 619,374 of 619,375 battery cars, and
+`median_kwh_100km` came out empty in `fleet_by_year_powertrain` and
+`efficiency_by_powertrain`. Both now carry real values.
+
+That is the only fleet number that moves. Every other exported table reproduces bit
+for bit against the pre-change SQL, checked by rebuilding both against the same
+Parquet and hashing every column.
 
 ## Reading the numbers correctly
 
@@ -330,8 +353,9 @@ is ~90% for 2000-2005 vintages against ~99.8% today.
 | `energy_coverage_by_year` | Where each vintage's per-car figure comes from |
 
 The per-vehicle and per-version tables — `vehicles`, `vehicle_energy`,
-`vehicle_variant`, `variants` — stay in `data/fuelecon.duckdb` rather than being
-written out as CSV, because they run to millions of rows. Query them directly:
+`vehicle_fuel`, `vehicle_variant`, `vehicle_variant_energy`, `variants` — stay in
+`data/fuelecon.duckdb` rather than being written out as CSV, because they run to
+millions of rows. Query them directly:
 
 ```sql
 -- Energy and its provenance for one car, per carrier.

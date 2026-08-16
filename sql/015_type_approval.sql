@@ -24,17 +24,26 @@
 -- per-vehicle work in 060 is built from.
 
 -- ---------------------------------------------------------------------------
--- Energy declarations per version.
+-- Energy declarations per version, per energy carrier.
 --
 -- The source has one row per drive per energy source, so a plug-in hybrid has a
--- petrol row and an electric row. Each figure sits on whichever row carries it,
--- so the group is reduced with max() rather than picked from a fixed row -- the
--- same reduction sql/010_vehicles.sql applies to the per-plate fuel table.
+-- petrol row and an electric row, and a bi-fuel car has a petrol row and an LPG
+-- row carrying *different* consumption figures. Collapsing those to one row per
+-- version would pick one fuel's number and lose which fuel it described, so the
+-- carrier stays in the key.
+--
+-- `codeenergiebron` is mapped by cross-tabulating it against the fuels the
+-- matched licence plates declare; the correspondence is unambiguous on the
+-- diagonal. `C` (463 rows across every vehicle category) never resolves to a
+-- carrier this study prices, and is dropped rather than guessed at.
 --
 -- Every declaration comes as a pair: `ogr`/`bgr` are the lower and upper bound
 -- over the configurations the version covers (`laag`/`hoog` in the NEDC fields).
 -- Both are kept. The width between them is a per-car measure of how much the one
 -- number on the licence plate is standing in for.
+--
+-- Electricity is divided by ten throughout: RDW declares it in Wh/km, and every
+-- figure in this repository is per 100 km.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE TABLE variant_energy AS
 SELECT
@@ -42,8 +51,16 @@ SELECT
     codevarianttgk                                           AS tgk_variant,
     codeuitvoeringtgk                                        AS tgk_version,
     TRY_CAST(volgnummerrevisieuitvoering AS INTEGER)         AS tgk_revision,
+    CASE trim(codeenergiebron)
+        WHEN 'B' THEN 'petrol'
+        WHEN 'A' THEN 'petrol'      -- alcohol/ethanol blends, pumped as petrol
+        WHEN 'D' THEN 'diesel'
+        WHEN 'E' THEN 'electricity'
+        WHEN 'G' THEN 'lpg'
+        WHEN 'H' THEN 'cng'
+        WHEN 'W' THEN 'hydrogen'
+    END                                                      AS carrier,
 
-    list_sort(list(DISTINCT nullif(trim(codeenergiebron), ''))) AS energy_sources,
     max(nullif(trim(uitlaatemissieniveau), ''))              AS euro_standard,
     max(nullif(TRY_CAST(maximumnettovermogenbgr AS DOUBLE), 0)) AS power_kw_max,
 
@@ -58,11 +75,11 @@ SELECT
     max(nullif(TRY_CAST(co2emisgewogengecombwltpogr AS DOUBLE), 0))    AS co2_wltp_weighted_lo,
     max(nullif(TRY_CAST(co2emisgewogengecombwltpbgr AS DOUBLE), 0))    AS co2_wltp_weighted_hi,
 
-    -- Electric side, WLTP.
-    max(nullif(TRY_CAST(verbruikvolledigelekwltpogr AS DOUBLE), 0))    AS kwh_wltp_bev_lo,
-    max(nullif(TRY_CAST(verbruikvolledigelekwltpbgr AS DOUBLE), 0))    AS kwh_wltp_bev_hi,
-    max(nullif(TRY_CAST(elekverbrexternoplaadbwltpogr AS DOUBLE), 0))  AS kwh_wltp_ovc_lo,
-    max(nullif(TRY_CAST(elekverbrexternoplaadbwltpbgr AS DOUBLE), 0))  AS kwh_wltp_ovc_hi,
+    -- Electric side, WLTP, converted from Wh/km to kWh/100 km.
+    max(nullif(TRY_CAST(verbruikvolledigelekwltpogr AS DOUBLE), 0)) / 10   AS kwh_wltp_bev_lo,
+    max(nullif(TRY_CAST(verbruikvolledigelekwltpbgr AS DOUBLE), 0)) / 10   AS kwh_wltp_bev_hi,
+    max(nullif(TRY_CAST(elekverbrexternoplaadbwltpogr AS DOUBLE), 0)) / 10 AS kwh_wltp_ovc_lo,
+    max(nullif(TRY_CAST(elekverbrexternoplaadbwltpbgr AS DOUBLE), 0)) / 10 AS kwh_wltp_ovc_hi,
     max(nullif(TRY_CAST(actieradiusvolledigelekwltpbgr AS DOUBLE), 0)) AS ev_range_wltp,
     max(nullif(TRY_CAST(actieradiusexternoplaadwltpbgr AS DOUBLE), 0)) AS ev_range_ovc_wltp,
 
@@ -81,11 +98,12 @@ SELECT
     max(nullif(TRY_CAST(co2emissiestadnedchoog AS DOUBLE), 0))         AS co2_nedc_urban_hi,
     max(nullif(TRY_CAST(co2emissiebuitennedclaag AS DOUBLE), 0))       AS co2_nedc_extra_urban_lo,
     max(nullif(TRY_CAST(co2emissiebuitennedchoog AS DOUBLE), 0))       AS co2_nedc_extra_urban_hi,
-    max(nullif(TRY_CAST(elekverbruikgecombineerdnedc AS DOUBLE), 0))   AS kwh_nedc,
-    max(nullif(TRY_CAST(elekverbruikgewgecombverbrnedc AS DOUBLE), 0)) AS kwh_nedc_weighted,
+    max(nullif(TRY_CAST(elekverbruikgecombineerdnedc AS DOUBLE), 0)) / 10   AS kwh_nedc,
+    max(nullif(TRY_CAST(elekverbruikgewgecombverbrnedc AS DOUBLE), 0)) / 10 AS kwh_nedc_weighted,
     max(nullif(TRY_CAST(elektrischeactieradiusnedc AS DOUBLE), 0))     AS ev_range_nedc,
     max(nullif(TRY_CAST(elekactieradiusextoplaadbnedc AS DOUBLE), 0))  AS ev_range_ovc_nedc
 FROM raw_tgk_energy
+WHERE trim(codeenergiebron) IN ('A', 'B', 'D', 'E', 'G', 'H', 'W')
 GROUP BY ALL;
 
 -- ---------------------------------------------------------------------------
@@ -162,33 +180,27 @@ SELECT
 FROM raw_tgk_gearbox
 GROUP BY ALL;
 
--- One row per version, everything joined. The spine is the union of the energy and
--- basis keys: a version can carry road load without an energy declaration, and the
--- reverse, and dropping either would silently thin the match rate.
+-- One row per version: what the car is, as against what it consumes. The spine is
+-- the union of the basis and drivetrain keys, since a version can carry one
+-- without the other and dropping either would silently thin the match rate.
 CREATE OR REPLACE TABLE variants AS
 SELECT
-    coalesce(e.tgk_number, b.tgk_number)     AS tgk_number,
-    coalesce(e.tgk_variant, b.tgk_variant)   AS tgk_variant,
-    coalesce(e.tgk_version, b.tgk_version)   AS tgk_version,
-    coalesce(e.tgk_revision, b.tgk_revision) AS tgk_revision,
-    e.* EXCLUDE (tgk_number, tgk_variant, tgk_version, tgk_revision),
+    coalesce(b.tgk_number, d.tgk_number)     AS tgk_number,
+    coalesce(b.tgk_variant, d.tgk_variant)   AS tgk_variant,
+    coalesce(b.tgk_version, d.tgk_version)   AS tgk_version,
+    coalesce(b.tgk_revision, d.tgk_revision) AS tgk_revision,
     b.* EXCLUDE (tgk_number, tgk_variant, tgk_version, tgk_revision),
     d.* EXCLUDE (tgk_number, tgk_variant, tgk_version, tgk_revision),
     g.* EXCLUDE (tgk_number, tgk_variant, tgk_version, tgk_revision)
-FROM variant_energy e
-FULL JOIN variant_basis b
-       ON e.tgk_number = b.tgk_number AND e.tgk_variant = b.tgk_variant
-      AND e.tgk_version = b.tgk_version AND e.tgk_revision = b.tgk_revision
-LEFT JOIN variant_drivetrain d
-       ON d.tgk_number = coalesce(e.tgk_number, b.tgk_number)
-      AND d.tgk_variant = coalesce(e.tgk_variant, b.tgk_variant)
-      AND d.tgk_version = coalesce(e.tgk_version, b.tgk_version)
-      AND d.tgk_revision = coalesce(e.tgk_revision, b.tgk_revision)
+FROM variant_basis b
+FULL JOIN variant_drivetrain d
+       ON d.tgk_number = b.tgk_number AND d.tgk_variant = b.tgk_variant
+      AND d.tgk_version = b.tgk_version AND d.tgk_revision = b.tgk_revision
 LEFT JOIN variant_gearbox g
-       ON g.tgk_number = coalesce(e.tgk_number, b.tgk_number)
-      AND g.tgk_variant = coalesce(e.tgk_variant, b.tgk_variant)
-      AND g.tgk_version = coalesce(e.tgk_version, b.tgk_version)
-      AND g.tgk_revision = coalesce(e.tgk_revision, b.tgk_revision);
+       ON g.tgk_number = coalesce(b.tgk_number, d.tgk_number)
+      AND g.tgk_variant = coalesce(b.tgk_variant, d.tgk_variant)
+      AND g.tgk_version = coalesce(b.tgk_version, d.tgk_version)
+      AND g.tgk_revision = coalesce(b.tgk_revision, d.tgk_revision);
 
 -- ---------------------------------------------------------------------------
 -- Licence plate -> version.
@@ -198,6 +210,10 @@ LEFT JOIN variant_gearbox g
 -- revision is used and the row says so: an approval revision restates a version
 -- rather than replacing it, so a neighbouring revision is a close description of
 -- the same car, but it is not the one the car was certified against.
+--
+-- The same rule is applied twice, because the two targets have different grains:
+-- once per plate against the technical table, once per plate and carrier against
+-- the energy table. Each picks the nearest revision it actually holds.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE TABLE vehicle_variant AS
 WITH keyed AS (
@@ -235,9 +251,46 @@ ranked AS (
 )
 SELECT * EXCLUDE (rn) FROM ranked WHERE rn = 1;
 
+-- The same match, per plate and carrier, against the energy declarations.
+CREATE OR REPLACE TABLE vehicle_variant_energy AS
+WITH keyed AS (
+    SELECT kenteken, tgk_number, tgk_variant, tgk_version, tgk_revision
+    FROM vehicles
+    WHERE tgk_number IS NOT NULL AND tgk_variant IS NOT NULL AND tgk_version IS NOT NULL
+),
+ranked AS (
+    SELECT
+        k.kenteken,
+        e.*,
+        row_number() OVER (
+            PARTITION BY k.kenteken, e.carrier
+            ORDER BY
+                CASE WHEN e.tgk_revision = k.tgk_revision THEN 0
+                     WHEN e.tgk_revision <  k.tgk_revision THEN 1
+                     ELSE 2 END,
+                CASE WHEN e.tgk_revision < k.tgk_revision THEN -e.tgk_revision
+                     ELSE e.tgk_revision END
+        )                                                    AS rn
+    FROM keyed k
+    JOIN variant_energy e
+      ON e.tgk_number = k.tgk_number
+     AND e.tgk_variant = k.tgk_variant
+     AND e.tgk_version = k.tgk_version
+)
+SELECT * EXCLUDE (rn) FROM ranked WHERE rn = 1;
+
 -- How well the chain holds up, per vintage. Read this before trusting anything
 -- built on the version-level figures for a given build year.
 CREATE OR REPLACE TABLE variant_match_quality AS
+WITH energy AS (
+    SELECT
+        kenteken,
+        max(l_wltp_hi)          AS l_wltp_hi,
+        max(l_nedc_hi)          AS l_nedc_hi,
+        max(co2_nedc_urban_hi)  AS co2_nedc_urban_hi
+    FROM vehicle_variant_energy
+    GROUP BY kenteken
+)
 SELECT
     v.build_year,
     count(*)                                                 AS vehicles,
@@ -246,11 +299,12 @@ SELECT
     count(*) FILTER (WHERE m.match_quality = 'exact')        AS matched_exact,
     count(*) FILTER (WHERE m.match_quality <> 'exact')       AS matched_other_revision,
     round(100.0 * count(m.kenteken) / count(*), 1)           AS pct_matched,
-    round(100.0 * count(m.l_wltp_hi) / count(*), 1)          AS pct_with_wltp_litres,
-    round(100.0 * count(m.l_nedc_hi) / count(*), 1)          AS pct_with_nedc_litres,
-    round(100.0 * count(m.co2_nedc_urban_hi) / count(*), 1)  AS pct_with_nedc_phases,
+    round(100.0 * count(e.l_wltp_hi) / count(*), 1)          AS pct_with_wltp_litres,
+    round(100.0 * count(e.l_nedc_hi) / count(*), 1)          AS pct_with_nedc_litres,
+    round(100.0 * count(e.co2_nedc_urban_hi) / count(*), 1)  AS pct_with_nedc_phases,
     round(100.0 * count(m.road_load_f0_hi) / count(*), 1)    AS pct_with_road_load
 FROM vehicles v
 LEFT JOIN vehicle_variant m USING (kenteken)
+LEFT JOIN energy e USING (kenteken)
 GROUP BY v.build_year
 ORDER BY v.build_year;

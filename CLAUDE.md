@@ -80,7 +80,9 @@ number out of this repository.
   three corrections applied. Use for anything about how the fleet changed.
 - **Per-car layer** (`015` and `060`: `vehicle_energy`, `vehicle_variant`). One row
   per licence plate per energy carrier, with provenance. Use for anything that
-  compares two specific cars — a household replacing one with another, say.
+  compares two specific cars — a household replacing one with another, say. The
+  grain is the *fuel row*, not the car, so a bi-fuel car gets a petrol row and an
+  LPG row carrying their own declared figures.
 
 The corrections in `050` are constant within powertrain (WLTP era) or within build
 year (NEDC era). That resolution is right for a fleet average and wrong for a
@@ -90,14 +92,16 @@ powertrain dummy would not, while looking like it does.
 `energy_per_100km_typeapproval` varies car by car; `energy_per_100km_onroad` is
 there to be compared against, not to be trusted as a per-car quantity.
 
-`015` and `060` are additive. They do not feed `020`–`050`, and the published fleet
-numbers do not move when they change. Keep it that way: if a better per-car figure
-should also change the fleet series, change the fleet series deliberately.
+`015` and `060` are additive. They do not feed `020`–`050`, and every fleet table
+reproduces bit for bit against the pre-change SQL, with one exception: fixing the
+Wh/km units below filled in `median_kwh_100km`, which had been empty. Keep it that
+way: if a better per-car figure should also change the fleet series, change the
+fleet series deliberately.
 
 ## Domain traps
 
-These are the ways this dataset produces confident wrong answers. All four are
-handled in `sql/010_vehicles.sql`; read the comments there before changing it.
+These are the ways this dataset produces confident wrong answers. The first four
+are handled in `sql/010_vehicles.sql`; read the comments there before changing it.
 
 1. **NEDC vs WLTP.** Type approval switched cycles over 2017-2018 and WLTP figures
    run 15-25% higher for the same car. Never build a CO2 or l/100km series that
@@ -114,6 +118,25 @@ handled in `sql/010_vehicles.sql`; read the comments there before changing it.
    panel of car replacements built from this snapshot is missing precisely the cars
    that were replaced *because* they were finished. That needs historical register
    snapshots, or CBS's copy, which retains deregistrations.
+6. **Electricity is declared in Wh/km, fuel in l/100 km.** Every RDW and TGK
+   electric field is ten times what its name suggests: the median battery car reads
+   162, meaning 16.2 kWh/100 km. `010` and `015` divide by ten at the cast, so
+   everything downstream is per 100 km. This one bit before it was caught — the
+   `BETWEEN 5 AND 60` bound on `kwh_100km` discarded 619,374 of 619,375 battery
+   cars, and `median_kwh_100km` came out empty in every exported table.
+7. **A self-charging hybrid has an `Elektriciteit` fuel row but no plug.** Its
+   kilowatt hours are made on board from petrol already counted in its litres, so
+   giving it an electricity carrier bills the same energy twice. Only `BEV` and
+   `PHEV` get one.
+8. **Bi-fuel cars declare different consumption per fuel.** 25,493 of 57,534 LPG
+   cars quote one figure on petrol and another on gas. Anything that reduces a car
+   to a single consumption number picks one and mislabels it, which is why
+   `vehicle_energy` is keyed on the fuel row rather than the car.
+
+Known and not fixed: `mode()` in `020_fleet_composition.sql` is non-deterministic
+under parallel execution, so `main_powertrain` can change between two builds of
+identical data — 475 model x vintage cells have a tied top powertrain. Everything
+else in the fleet layer reproduces exactly.
 
 Also: `build_year` is `datum_eerste_toelating` (first admission anywhere), so used
 imports carry a foreign build year; `owner_since` is the start of the *current*

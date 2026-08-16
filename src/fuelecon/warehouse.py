@@ -25,7 +25,8 @@ STAGING_TABLES = frozenset({
     "variant_gearbox",
     "variants",
     "vehicle_variant",
-    "vehicle_energy_wide",
+    "vehicle_variant_energy",
+    "vehicle_fuel",
     "vehicle_energy",
 })
 

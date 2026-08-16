@@ -10,7 +10,15 @@
 -- carrier is what makes that a join against a price series rather than a rewrite
 -- of the arithmetic for every powertrain combination.
 --
--- WHAT IT DOES NOT DO. It does not apply the constant-mass counterfactual from
+-- WHY CARRIERS COME FROM THE FUEL ROWS. RDW records one row per fuel a car can
+-- run on, each with its own consumption. 25,493 of the 57,534 LPG cars here
+-- declare different figures for petrol and for LPG -- one reads 6.80 on gas and
+-- 5.10 on petrol. Reducing that to one figure per car picks whichever is larger
+-- and then labels it with whichever fuel the classifier happened to prefer, so the
+-- car gets one carrier, the wrong number, and the wrong price. The grain here is
+-- therefore the fuel row, not the car.
+--
+-- WHAT THIS DOES NOT DO. It does not apply the constant-mass counterfactual from
 -- step 050. That correction answers a fleet question -- what would a vintage have
 -- consumed had cars not grown -- and holding a specific car at a mass it never had
 -- is not a statement about what it costs its owner to drive.
@@ -26,207 +34,199 @@
 -- per-vehicle measurement (OBFCM) or a per-model series can be obtained.
 
 -- ---------------------------------------------------------------------------
--- Resolve one figure per car, recording where it came from.
+-- The declarations on the licence plate, one row per car per carrier.
+--
+-- Figures are taken from that carrier's own fuel rows. Where a carrier's rows are
+-- blank, the car-level maximum stands in: RDW sometimes writes a single set of
+-- figures onto the first fuel row only, and falling back keeps those cars rather
+-- than dropping them for a bookkeeping choice made at registration.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE TABLE vehicle_fuel AS
+WITH rows_by_carrier AS (
+    SELECT
+        kenteken,
+        CASE trim(brandstof_omschrijving)
+            WHEN 'Benzine'       THEN 'petrol'
+            WHEN 'Alcohol'       THEN 'petrol'   -- ethanol blends, pumped as petrol
+            WHEN 'Diesel'        THEN 'diesel'
+            WHEN 'LPG'           THEN 'lpg'
+            WHEN 'CNG'           THEN 'cng'
+            WHEN 'LNG'           THEN 'lng'
+            WHEN 'Elektriciteit' THEN 'electricity'
+            WHEN 'Waterstof'     THEN 'hydrogen'
+        END                                                          AS carrier,
+        TRY_CAST(brandstofverbruik_gecombineerd AS DOUBLE)           AS l_nedc,
+        TRY_CAST(brandstofverbruik_gewogen_gecombineerd AS DOUBLE)   AS l_nedc_weighted,
+        TRY_CAST(brandstof_verbruik_gecombineerd_wltp AS DOUBLE)     AS l_wltp,
+        TRY_CAST(brandstof_verbruik_gewogen_gecombineerd_wltp AS DOUBLE) AS l_wltp_weighted
+    FROM raw_fuel
+),
+per_carrier AS (
+    SELECT kenteken, carrier,
+           max(l_nedc) AS l_nedc, max(l_nedc_weighted) AS l_nedc_weighted,
+           max(l_wltp) AS l_wltp, max(l_wltp_weighted) AS l_wltp_weighted
+    FROM rows_by_carrier WHERE carrier IS NOT NULL GROUP BY 1, 2
+),
+per_vehicle AS (
+    SELECT kenteken,
+           max(l_nedc) AS l_nedc, max(l_nedc_weighted) AS l_nedc_weighted,
+           max(l_wltp) AS l_wltp, max(l_wltp_weighted) AS l_wltp_weighted
+    FROM rows_by_carrier GROUP BY 1
+)
+SELECT
+    c.kenteken,
+    c.carrier,
+    coalesce(c.l_nedc,          v.l_nedc)          AS l_nedc,
+    coalesce(c.l_nedc_weighted, v.l_nedc_weighted) AS l_nedc_weighted,
+    coalesce(c.l_wltp,          v.l_wltp)          AS l_wltp,
+    coalesce(c.l_wltp_weighted, v.l_wltp_weighted) AS l_wltp_weighted
+FROM per_carrier c
+JOIN per_vehicle v USING (kenteken);
+
+-- ---------------------------------------------------------------------------
+-- One row per car per carrier, with the figure resolved and its provenance.
 --
 -- Four sources in preference order, best first:
 --   wltp_plate     WLTP declaration on the licence plate
 --   wltp_variant   WLTP declaration on the type-approval version
---   nedc_plate     NEDC declaration on the licence plate
---   nedc_variant   NEDC declaration on the type-approval version
+--   nedc_plate     NEDC declaration on the licence plate, converted
+--   nedc_variant   NEDC declaration on the version, converted
 --
 -- The variant sources are what the type-approval join buys: they fill plates whose
--- own fuel record is blank, which is most of the ~10% gap in the early vintages.
--- Where a version quotes a range, its midpoint is taken and both bounds are kept.
+-- own fuel record is blank. Where a version quotes a range, its midpoint is taken
+-- and both bounds are kept.
+--
+-- Combustion and electricity are resolved separately, because for a plug-in hybrid
+-- the two are not the same kind of number. Its litres are the utility-factor
+-- weighted figure, so its kilowatt hours must be the weighted one too ("extern
+-- opladen"); the pure-electric figure describes only the kilometres it drives on
+-- the battery and would double-count against them.
 -- ---------------------------------------------------------------------------
-CREATE OR REPLACE TABLE vehicle_energy_wide AS
-WITH src AS (
+CREATE OR REPLACE TABLE vehicle_energy AS
+WITH base AS (
     SELECT
         v.kenteken,
         v.build_year,
         v.powertrain,
-        v.combustion_fuel,
-        v.kerb_mass_kg,
-        v.ev_range_km,
-        coalesce(v.ev_range_ovc_km, v.ev_range_ovc_nedc_km, m.ev_range_ovc_wltp,
-                 m.ev_range_ovc_nedc)                       AS ev_range_ovc_km,
+        f.carrier,
         b.band_id,
+        f.carrier = 'electricity'                            AS is_electric,
 
-        -- Litres per 100 km, by source. The weighted figure comes first in each
-        -- pair: for a plug-in hybrid it is the certified one, and for everything
-        -- else it is null and coalesces away.
-        coalesce(v.l_100km_wltp_weighted, v.l_100km_wltp)    AS l_wltp_plate,
-        coalesce((m.l_wltp_weighted_lo + m.l_wltp_weighted_hi) / 2,
-                 (m.l_wltp_lo + m.l_wltp_hi) / 2)            AS l_wltp_variant,
-        coalesce(v.l_100km_nedc_weighted, v.l_100km_nedc)    AS l_nedc_plate,
-        coalesce((m.l_nedc_weighted_lo + m.l_nedc_weighted_hi) / 2,
-                 (m.l_nedc_lo + m.l_nedc_hi) / 2)            AS l_nedc_variant,
-        coalesce(m.l_wltp_weighted_lo, m.l_wltp_lo)          AS l_wltp_variant_lo,
-        coalesce(m.l_wltp_weighted_hi, m.l_wltp_hi)          AS l_wltp_variant_hi,
+        -- Litres. The weighted figure comes first in each pair: for a plug-in
+        -- hybrid it is the certified one, and for everything else it is null.
+        coalesce(f.l_wltp_weighted, f.l_wltp)                AS plate_wltp,
+        coalesce(f.l_nedc_weighted, f.l_nedc)                AS plate_nedc,
+        coalesce((e.l_wltp_weighted_lo + e.l_wltp_weighted_hi) / 2,
+                 (e.l_wltp_lo + e.l_wltp_hi) / 2)            AS variant_wltp,
+        coalesce((e.l_nedc_weighted_lo + e.l_nedc_weighted_hi) / 2,
+                 (e.l_nedc_lo + e.l_nedc_hi) / 2)            AS variant_nedc,
+        coalesce(e.l_wltp_weighted_lo, e.l_wltp_lo)          AS variant_lo,
+        coalesce(e.l_wltp_weighted_hi, e.l_wltp_hi)          AS variant_hi,
 
-        -- kWh per 100 km. A plug-in hybrid's externally charged figure and a
-        -- battery car's are different quantities and are not coalesced together
-        -- across powertrains: which one applies is decided by powertrain here.
-        -- The plug-in takes "extern opladen", the figure that already carries the
-        -- utility factor, because it is the one that pairs with the weighted litres
-        -- chosen above. Its pure-electric figure describes only the kilometres it
-        -- drives on the battery and would double-count against them.
+        -- Kilowatt hours, already in kWh/100 km on both sides.
         CASE WHEN v.powertrain = 'PHEV'
              THEN coalesce(v.kwh_100km_ovc_wltp, v.kwh_100km)
-             ELSE v.kwh_100km
-        END                                                  AS kwh_wltp_plate,
+             ELSE v.kwh_100km END                            AS plate_wltp_kwh,
+        CASE WHEN v.powertrain = 'PHEV' THEN v.kwh_100km_nedc_weighted END AS plate_nedc_kwh,
         CASE WHEN v.powertrain = 'PHEV'
-             THEN (m.kwh_wltp_ovc_lo + m.kwh_wltp_ovc_hi) / 2
-             ELSE (m.kwh_wltp_bev_lo + m.kwh_wltp_bev_hi) / 2
-        END                                                  AS kwh_wltp_variant,
-        CASE WHEN v.powertrain = 'PHEV' THEN v.kwh_100km_nedc_weighted END AS kwh_nedc_plate,
-        CASE WHEN v.powertrain = 'PHEV' THEN m.kwh_nedc_weighted ELSE m.kwh_nedc END
-                                                             AS kwh_nedc_variant,
-        CASE WHEN v.powertrain = 'PHEV' THEN m.kwh_wltp_ovc_lo ELSE m.kwh_wltp_bev_lo END
-                                                             AS kwh_wltp_variant_lo,
-        CASE WHEN v.powertrain = 'PHEV' THEN m.kwh_wltp_ovc_hi ELSE m.kwh_wltp_bev_hi END
-                                                             AS kwh_wltp_variant_hi,
-
-        -- Carried through for the physical work the corrections stand in for.
-        m.co2_nedc_urban_hi,
-        m.co2_nedc_extra_urban_hi,
-        m.road_load_f0_hi,
-        m.road_load_f1_hi,
-        m.road_load_f2_hi,
-        m.gearbox_type,
-        m.gears,
-        m.engine_code,
-        m.is_plug_in                                         AS approval_says_plug_in,
-        m.match_quality
+             THEN (e.kwh_wltp_ovc_lo + e.kwh_wltp_ovc_hi) / 2
+             ELSE (e.kwh_wltp_bev_lo + e.kwh_wltp_bev_hi) / 2 END AS variant_wltp_kwh,
+        CASE WHEN v.powertrain = 'PHEV' THEN e.kwh_nedc_weighted ELSE e.kwh_nedc END
+                                                             AS variant_nedc_kwh,
+        CASE WHEN v.powertrain = 'PHEV' THEN e.kwh_wltp_ovc_lo ELSE e.kwh_wltp_bev_lo END
+                                                             AS variant_lo_kwh,
+        CASE WHEN v.powertrain = 'PHEV' THEN e.kwh_wltp_ovc_hi ELSE e.kwh_wltp_bev_hi END
+                                                             AS variant_hi_kwh
     FROM vehicles v
-    LEFT JOIN vehicle_variant m USING (kenteken)
+    JOIN vehicle_fuel f USING (kenteken)
+    LEFT JOIN vehicle_variant_energy e ON e.kenteken = v.kenteken AND e.carrier = f.carrier
     LEFT JOIN mass_bands b
            ON v.kerb_mass_kg >= b.mass_min AND v.kerb_mass_kg < b.mass_max
+    -- A self-charging hybrid carries an Elektriciteit fuel row because it has a
+    -- battery, but it cannot be plugged in: every kilowatt hour it uses was made
+    -- on board out of petrol it has already been charged for. Pricing that row
+    -- would bill the same energy twice, so only externally chargeable cars get an
+    -- electricity carrier. (It is empty in any case -- of the 774,904 rows this
+    -- drops, essentially none carried a figure.)
+    WHERE f.carrier <> 'electricity' OR v.powertrain IN ('BEV', 'PHEV')
+),
+resolved AS (
+    SELECT
+        kenteken, build_year, powertrain, carrier, band_id, is_electric,
+        CASE WHEN is_electric THEN plate_wltp_kwh   ELSE plate_wltp   END AS v_wltp_plate,
+        CASE WHEN is_electric THEN variant_wltp_kwh ELSE variant_wltp END AS v_wltp_variant,
+        CASE WHEN is_electric THEN plate_nedc_kwh   ELSE plate_nedc   END AS v_nedc_plate,
+        CASE WHEN is_electric THEN variant_nedc_kwh ELSE variant_nedc END AS v_nedc_variant,
+        CASE WHEN is_electric THEN variant_lo_kwh   ELSE variant_lo   END AS declared_lo,
+        CASE WHEN is_electric THEN variant_hi_kwh   ELSE variant_hi   END AS declared_hi
+    FROM base
 ),
 picked AS (
     SELECT
         *,
-        coalesce(l_wltp_plate, l_wltp_variant, l_nedc_plate, l_nedc_variant) AS l_raw,
+        coalesce(v_wltp_plate, v_wltp_variant, v_nedc_plate, v_nedc_variant) AS raw_value,
         CASE
-            WHEN l_wltp_plate   IS NOT NULL THEN 'wltp_plate'
-            WHEN l_wltp_variant IS NOT NULL THEN 'wltp_variant'
-            WHEN l_nedc_plate   IS NOT NULL THEN 'nedc_plate'
-            WHEN l_nedc_variant IS NOT NULL THEN 'nedc_variant'
-        END                                                  AS l_basis,
-        coalesce(kwh_wltp_plate, kwh_wltp_variant, kwh_nedc_plate, kwh_nedc_variant) AS kwh_raw,
-        CASE
-            WHEN kwh_wltp_plate   IS NOT NULL THEN 'wltp_plate'
-            WHEN kwh_wltp_variant IS NOT NULL THEN 'wltp_variant'
-            WHEN kwh_nedc_plate   IS NOT NULL THEN 'nedc_plate'
-            WHEN kwh_nedc_variant IS NOT NULL THEN 'nedc_variant'
-        END                                                  AS kwh_basis
-    FROM src
+            WHEN v_wltp_plate   IS NOT NULL THEN 'wltp_plate'
+            WHEN v_wltp_variant IS NOT NULL THEN 'wltp_variant'
+            WHEN v_nedc_plate   IS NOT NULL THEN 'nedc_plate'
+            WHEN v_nedc_variant IS NOT NULL THEN 'nedc_variant'
+        END                                                  AS basis
+    FROM resolved
 )
 SELECT
-    p.*,
+    p.kenteken,
+    p.build_year,
+    p.powertrain,
+    p.carrier,
+    CASE p.carrier WHEN 'electricity' THEN 'kWh/100km'
+                   WHEN 'cng' THEN 'kg/100km'
+                   WHEN 'lng' THEN 'kg/100km'
+                   WHEN 'hydrogen' THEN 'kg/100km'
+                   ELSE 'l/100km' END                        AS unit,
 
     -- On one cycle. A figure that came from NEDC is multiplied by the factor
     -- estimated in step 040 for its powertrain and mass band; a WLTP figure is
-    -- already there. Same rule, same factors, as vehicles_wltp.
-    CASE
-        WHEN p.l_basis IN ('wltp_plate', 'wltp_variant') THEN p.l_raw
-        WHEN p.l_basis IN ('nedc_plate', 'nedc_variant')
-            THEN p.l_raw * coalesce(cc.ratio_l_applied, 1.20)
-    END                                                      AS l_100km_wltp_equiv,
+    -- already there. Electricity is left alone: those factors are estimated from
+    -- paired CO2 declarations and say nothing about kilowatt hours, so `cycle`
+    -- records which cycle an electric figure came from instead of converting it.
+    round(CASE
+        WHEN p.basis IN ('wltp_plate', 'wltp_variant') OR p.is_electric THEN p.raw_value
+        ELSE p.raw_value * coalesce(cc.ratio_l_applied, 1.20)
+    END, 4)                                                  AS energy_per_100km_typeapproval,
 
     -- On the road. Mirrors step 050 exactly: a plug-in hybrid always takes the
     -- WLTP-era factor because its divergence is about how often it is plugged in
     -- rather than which laboratory measured it; anything else converted from NEDC
     -- is corrected off its own NEDC figure with that build year's gap.
-    CASE
-        WHEN p.powertrain IN ('BEV', 'FCEV') THEN NULL
-        WHEN p.powertrain = 'PHEV' OR p.l_basis IN ('wltp_plate', 'wltp_variant')
-            THEN CASE WHEN p.l_basis IN ('wltp_plate', 'wltp_variant')
-                      THEN p.l_raw * (1 + gw.gap)
-                      ELSE p.l_raw * coalesce(cc.ratio_l_applied, 1.20) * (1 + gw.gap) END
-        ELSE p.l_raw * (1 + gn.gap)
-    END                                                      AS l_100km_onroad,
-    CASE
-        WHEN p.powertrain IN ('BEV', 'FCEV') THEN NULL
-        WHEN p.powertrain = 'PHEV' OR p.l_basis IN ('wltp_plate', 'wltp_variant') THEN gw.gap
-        WHEN p.l_basis IS NOT NULL THEN gn.gap
-    END                                                      AS l_gap_applied,
+    round(CASE
+        WHEN p.is_electric THEN NULL
+        WHEN p.basis IN ('wltp_plate', 'wltp_variant') THEN p.raw_value * (1 + gw.gap)
+        WHEN p.powertrain = 'PHEV'
+            THEN p.raw_value * coalesce(cc.ratio_l_applied, 1.20) * (1 + gw.gap)
+        ELSE p.raw_value * (1 + gn.gap)
+    END, 4)                                                  AS energy_per_100km_onroad,
 
+    round(p.declared_lo, 4)                                  AS declared_lo,
+    round(p.declared_hi, 4)                                  AS declared_hi,
     -- How wide the version's own declaration is, as a share of its midpoint. A car
     -- whose approval spans 5.2 to 6.4 l/100 km is being described by one number on
     -- its licence plate, and this says by how much.
-    round(100.0 * (p.l_wltp_variant_hi - p.l_wltp_variant_lo)
-          / nullif((p.l_wltp_variant_hi + p.l_wltp_variant_lo) / 2, 0), 2) AS l_spread_pct,
-    round(100.0 * (p.kwh_wltp_variant_hi - p.kwh_wltp_variant_lo)
-          / nullif((p.kwh_wltp_variant_hi + p.kwh_wltp_variant_lo) / 2, 0), 2) AS kwh_spread_pct,
+    round(100.0 * (p.declared_hi - p.declared_lo)
+          / nullif((p.declared_hi + p.declared_lo) / 2, 0), 2) AS spread_pct,
 
-    -- The NEDC phase split as a ratio. Above 1 means the car is relatively worse in
-    -- town, which is where a short-trip household drives it.
-    round(p.co2_nedc_urban_hi / nullif(p.co2_nedc_extra_urban_hi, 0), 4) AS urban_penalty_nedc
+    coalesce(p.basis, 'none')                                AS basis,
+    CASE WHEN p.basis LIKE 'wltp%' THEN 'WLTP'
+         WHEN p.basis LIKE 'nedc%' THEN 'NEDC' END           AS cycle,
+    CASE
+        WHEN p.is_electric OR p.basis IS NULL THEN NULL
+        WHEN p.basis IN ('wltp_plate', 'wltp_variant') OR p.powertrain = 'PHEV' THEN gw.gap
+        ELSE gn.gap
+    END                                                      AS gap_applied
 FROM picked p
 LEFT JOIN cycle_conversion cc
        ON cc.powertrain = p.powertrain AND cc.band_id = p.band_id
 LEFT JOIN realworld_gap_wltp gw ON gw.powertrain = p.powertrain
 LEFT JOIN realworld_gap_nedc gn ON gn.build_year = p.build_year;
-
--- ---------------------------------------------------------------------------
--- One row per car per carrier it can draw energy from.
---
--- Rows are emitted for every carrier the car actually uses, including where the
--- figure is missing, so that a join against a price series shows a null cost
--- rather than silently dropping the car. `basis` says how much to trust it.
---
--- Electricity carries no on-road correction. There is a real gap between a battery
--- car's WLTP figure and what it draws in Dutch conditions, but this repository has
--- no sourced series for it, and inventing one here would put a fabricated number
--- on exactly the side of the switch the research is about.
---
--- Nor is electricity put on one cycle. The factors in step 040 are estimated from
--- paired CO2 declarations and say nothing about kilowatt hours, so an NEDC-era
--- electric figure is left as it was measured and `cycle` says which it is. Read
--- that column before comparing a 2015 battery car with a 2022 one.
---
--- The CNG unit is RDW's own and is not consistent across the cycle switch; CNG is
--- well under a tenth of a per cent of these vintages, so it is carried rather than
--- resolved. Check it before pricing those rows.
--- ---------------------------------------------------------------------------
-CREATE OR REPLACE TABLE vehicle_energy AS
-SELECT
-    kenteken,
-    build_year,
-    powertrain,
-    lower(combustion_fuel)                                   AS carrier,
-    CASE WHEN combustion_fuel = 'CNG' THEN 'kg/100km' ELSE 'l/100km' END AS unit,
-    round(l_100km_wltp_equiv, 4)                             AS energy_per_100km_typeapproval,
-    round(l_100km_onroad, 4)                                 AS energy_per_100km_onroad,
-    round(l_wltp_variant_lo, 4)                              AS declared_lo,
-    round(l_wltp_variant_hi, 4)                              AS declared_hi,
-    l_spread_pct                                             AS spread_pct,
-    coalesce(l_basis, 'none')                                AS basis,
-    CASE WHEN l_basis LIKE 'wltp%' THEN 'WLTP'
-         WHEN l_basis LIKE 'nedc%' THEN 'NEDC' END           AS cycle,
-    l_gap_applied                                            AS gap_applied
-FROM vehicle_energy_wide
-WHERE combustion_fuel IS NOT NULL
-
-UNION ALL
-
-SELECT
-    kenteken,
-    build_year,
-    powertrain,
-    'electricity'                                            AS carrier,
-    'kWh/100km'                                              AS unit,
-    round(kwh_raw, 4)                                        AS energy_per_100km_typeapproval,
-    NULL                                                     AS energy_per_100km_onroad,
-    round(kwh_wltp_variant_lo, 4)                            AS declared_lo,
-    round(kwh_wltp_variant_hi, 4)                            AS declared_hi,
-    kwh_spread_pct                                           AS spread_pct,
-    coalesce(kwh_basis, 'none')                              AS basis,
-    CASE WHEN kwh_basis LIKE 'wltp%' THEN 'WLTP'
-         WHEN kwh_basis LIKE 'nedc%' THEN 'NEDC' END         AS cycle,
-    NULL                                                     AS gap_applied
-FROM vehicle_energy_wide
-WHERE powertrain IN ('BEV', 'PHEV');
 
 -- ---------------------------------------------------------------------------
 -- How much of each vintage carries a usable per-car figure, and from where.
