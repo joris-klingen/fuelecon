@@ -16,14 +16,14 @@ fleet_total <- sum(fleet_by_year$vehicles)
 
 stack_df <- fleet_by_powertrain |>
   filter(powertrain %in% MAIN_POWERTRAINS) |>
-  mutate(aandrijving = label_powertrain(powertrain),
-         auto_dzd    = vehicles / 1000)
+  mutate(powertrain_label = label_powertrain(powertrain),
+         cars_k          = vehicles / 1000)
 
-p_age <- cpb_col(stack_df, x = build_year, y = auto_dzd, fill = aandrijving,
+p_age <- cpb_col(stack_df, x = build_year, y = cars_k, fill = powertrain_label,
   index = c(6, 5, 4, 2, 1),
-  title = "Nederlandse personenauto's naar bouwjaar en aandrijving",
-  ylab  = "duizend auto's",
-  xlab  = "bouwjaar") +
+  title = "Dutch passenger cars by build year and powertrain",
+  ylab  = "thousand cars",
+  xlab  = "build year") +
   scale_x_year()
 
 fig(p_age, "01_fleet_by_year_powertrain")
@@ -32,13 +32,13 @@ fig(p_age, "01_fleet_by_year_powertrain")
 
 # The same data as a share removes the survival effect from the picture: within a
 # vintage, what fraction of the survivors is electrified.
-p_share <- cpb_col(stack_df, x = build_year, y = auto_dzd, fill = aandrijving,
+p_share <- cpb_col(stack_df, x = build_year, y = cars_k, fill = powertrain_label,
   position = "fill",
   pct_axis = TRUE,
   index = c(6, 5, 4, 2, 1),
-  title = "Aandeel van de aandrijvingen binnen elk bouwjaar",
-  ylab  = "aandeel van de nog geregistreerde auto's",
-  xlab  = "bouwjaar") +
+  title = "Powertrain shares within each build year",
+  ylab  = "share of surviving cars",
+  xlab  = "build year") +
   scale_x_year()
 
 fig(p_share, "02_powertrain_share_by_year")
@@ -47,21 +47,21 @@ fig(p_share, "02_powertrain_share_by_year")
 
 top_models <- fleet_by_model |>
   slice_max(vehicles, n = 20) |>
-  mutate(naam = paste(
+  mutate(name = paste(
            # Title-case the shouty registry strings for the axis.
            tools::toTitleCase(tolower(make)), tools::toTitleCase(tolower(model))
          ),
-         auto_dzd = vehicles / 1000) |>
+         cars_k = vehicles / 1000) |>
   arrange(vehicles) |>
-  mutate(naam = factor(naam, levels = naam))
+  mutate(name = factor(name, levels = name))
 
-p_models <- cpb_col(top_models, x = naam, y = auto_dzd,
+p_models <- cpb_col(top_models, x = name, y = cars_k,
   orientation = "horizontal",
   fill_colour = unname(cpb_cols(6)),
   width = 0.7,
-  title = "Twintig meest voorkomende modellen, bouwjaren 2000-2024",
+  title = "Twenty most common models, build years 2000-2024",
   ylab  = "model",
-  xlab  = "duizend auto's")
+  xlab  = "thousand cars")
 
 fig(p_models, "03_top_models", height = 4.2)
 

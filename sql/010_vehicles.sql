@@ -176,8 +176,14 @@ SELECT
     nullif(
         trim(regexp_replace(
             regexp_replace(
-                trim(regexp_replace(model_raw, '[^A-Z0-9 ]', ' ', 'g')),
-                '^' || regexp_escape(make) || '( |$)', ''
+                -- Two forms of the same redundancy: "MAZDA 2" under make MAZDA, and
+                -- "MAZDA2" without the space, which would otherwise survive as a
+                -- separate nameplate and split the model's history in two.
+                regexp_replace(
+                    trim(regexp_replace(model_raw, '[^A-Z0-9 ]', ' ', 'g')),
+                    '^' || regexp_escape(make) || '( |$)', ''
+                ),
+                '^' || regexp_escape(make) || '([0-9])', '\1'
             ),
             ' +', ' ', 'g'
         )),

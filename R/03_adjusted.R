@@ -82,16 +82,16 @@ cm_fleet <- mass_fleet |>
 # and road was widening faster than the engines were improving.
 gap_long <- fleet_fuel |>
   select(build_year,
-         `typegoedkeuring (WLTP-equivalent)` = mean_l_typeapproval,
-         `op de weg`                          = mean_l_real_combustion) |>
-  pivot_longer(-build_year, names_to = "reeks", values_to = "l")
+         `type approval (WLTP-equivalent)` = mean_l_typeapproval,
+         `on the road`                     = mean_l_real_combustion) |>
+  pivot_longer(-build_year, names_to = "series", values_to = "l")
 
-p_gap <- cpb_line(gap_long, x = build_year, y = l, colour = reeks,
+p_gap <- cpb_line(gap_long, x = build_year, y = l, colour = series,
   index = c(6, 2),
-  title = "Verbruik van verbrandingsmotoren: test versus weg",
-  subtitle = "alles omgerekend naar WLTP-equivalent; bron gat: COM(2024) 122",
-  ylab  = "liter per 100 km",
-  xlab  = "bouwjaar") +
+  title = "Combustion engines: laboratory versus road",
+  subtitle = "all on a WLTP-equivalent basis; gap factors from COM(2024) 122",
+  ylab  = "litres per 100 km",
+  xlab  = "build year") +
   scale_x_year()
 
 fig(p_gap, "08_typeapproval_vs_real")
@@ -101,16 +101,16 @@ fig(p_gap, "08_typeapproval_vs_real")
 petrol_cm <- cm_real |>
   filter(powertrain == "Petrol") |>
   select(build_year,
-         `werkelijk verbruik` = actual,
-         `bij gewicht van 2000` = counterfact) |>
-  pivot_longer(-build_year, names_to = "reeks", values_to = "l")
+         `actual`             = actual,
+         `at 2000 kerb mass`  = counterfact) |>
+  pivot_longer(-build_year, names_to = "series", values_to = "l")
 
-p_mass <- cpb_line(petrol_cm, x = build_year, y = l, colour = reeks,
+p_mass <- cpb_line(petrol_cm, x = build_year, y = l, colour = series,
   index = c(6, 2),
-  title = "Benzineauto's op de weg, werkelijk en bij gelijkblijvend gewicht",
-  subtitle = "binnen benzine alleen blijft het gewicht vrijwel gelijk: nauwelijks effect",
-  ylab  = "liter per 100 km",
-  xlab  = "bouwjaar") +
+  title = "Petrol cars on the road, actual and at constant kerb mass",
+  subtitle = "within petrol alone mass barely moves, so the correction is small",
+  ylab  = "litres per 100 km",
+  xlab  = "build year") +
   scale_x_year()
 
 fig(p_mass, "09_petrol_constant_mass")
@@ -118,16 +118,16 @@ fig(p_mass, "09_petrol_constant_mass")
 # The fleet-level version, where the mass gain is real.
 fleet_cm <- cm_fleet |>
   select(build_year,
-         `werkelijk verbruik` = actual,
-         `bij gewicht van 2000` = counterfact) |>
-  pivot_longer(-build_year, names_to = "reeks", values_to = "l")
+         `actual`            = actual,
+         `at 2000 kerb mass` = counterfact) |>
+  pivot_longer(-build_year, names_to = "series", values_to = "l")
 
-p_mass_fleet <- cpb_line(fleet_cm, x = build_year, y = l, colour = reeks,
+p_mass_fleet <- cpb_line(fleet_cm, x = build_year, y = l, colour = series,
   index = c(6, 2),
-  title = "Verbrandingsmotoren op de weg, bij werkelijk en bij gelijkblijvend gewicht",
-  subtitle = "verschil tussen de lijnen is wat het zwaarder worden heeft gekost",
-  ylab  = "liter per 100 km",
-  xlab  = "bouwjaar") +
+  title = "Combustion engines on the road, actual and at constant kerb mass",
+  subtitle = "the gap between the lines is what heavier cars cost",
+  ylab  = "litres per 100 km",
+  xlab  = "build year") +
   scale_x_year()
 
 fig(p_mass_fleet, "11_fleet_constant_mass")
@@ -136,15 +136,16 @@ fig(p_mass_fleet, "11_fleet_constant_mass")
 
 fleet_long <- fleet_fuel |>
   select(build_year,
-         `alle auto's (elektrisch = 0 l)` = mean_l_real_fleet,
-         `alleen verbrandingsmotoren`     = mean_l_real_combustion) |>
-  pivot_longer(-build_year, names_to = "reeks", values_to = "l")
+         `all cars (electric = 0 l)` = mean_l_real_fleet,
+         `combustion engines only`   = mean_l_real_combustion) |>
+  pivot_longer(-build_year, names_to = "series", values_to = "l")
 
-p_fleet_fuel <- cpb_line(fleet_long, x = build_year, y = l, colour = reeks,
+p_fleet_fuel <- cpb_line(fleet_long, x = build_year, y = l, colour = series,
   index = c(6, 2),
-  title = "Werkelijk brandstofverbruik per bouwjaar",
-  ylab  = "liter per 100 km",
-  xlab  = "bouwjaar") +
+  title = "Real-world fuel use by build year",
+  subtitle = "electric cars entered at zero litres, not dropped",
+  ylab  = "litres per 100 km",
+  xlab  = "build year") +
   scale_x_year()
 
 fig(p_fleet_fuel, "10_fleet_real_fuel")

@@ -8,17 +8,19 @@ Two questions:
 1. **How much did fuel efficiency improve** across build years 2000-2024?
 2. **How many of each car** are still present in the current fleet?
 
-**[Read the results page](https://claude.ai/code/artifact/f757c6cf-8711-419f-b8b8-1763015c9e09)** — all seven
-figures with the headline numbers and the caveats. Also checked in at
+**[Read the results page](https://claude.ai/code/artifact/f757c6cf-8711-419f-b8b8-1763015c9e09)** — a short
+note on what this means for the marginal cost of driving, with five figures. Also checked in at
 [`docs/results.html`](docs/results.html), self-contained, openable straight from a
 clone.
 
 ## Result in one line
 
-On a like-for-like basis — one measurement cycle, litres actually burned, constant
-kerb mass — fuel economy improved by **40%** between build years 2000 and 2024, not
-the **52%** the type-approval figures claim. The difference is a widening gap
-between laboratory and road, and cars getting heavier.
+Fuel efficiency improved about **45%** between build years 2000 and 2024 — 45.3%
+holding the car's specification fixed, 46.4% following the same nameplate through
+its generations. Two methods with entirely different identifying variation agree to
+within a point. Both show a plateau from 2014 to 2019; neither shows engines
+getting worse. The fleet-level numbers that suggest otherwise are composition and
+measurement, not engineering.
 
 ## Quick start
 
@@ -194,6 +196,196 @@ a larger car electrified it left the petrol category and took its mass with it. 
 fleet-wide mass gain is largely that composition shift, so the correction is only
 meaningful with the powertrains pooled. Both are reported.
 
+## Replacing your car with a five-year-newer one
+
+Holding the kind of car fixed — same body type, same size class — how much fuel
+does five years of progress buy? (`sql/060_segments.sql`, figures 12–16.)
+
+| Newer car built | Replaces | Saving |
+|---|---|---|
+| 2010 | 2005 | 0.70 l/100km (8.7%) |
+| 2013 | 2008 | 1.28 l/100km (16.0%) |
+| 2019 | 2014 | **−0.74 l/100km (−10.8%)** |
+| 2024 | 2019 | **2.02 l/100km (25.1%)** |
+
+The 2024-against-2019 row is the only clean one: 100% and 91% of the two sides
+carry a measured WLTP figure, so no conversion assumption enters. Repeating it on
+true vehicle length instead of mass bands gives 1.66 l/100km (21.6%) — the
+mass-band version overstates by about 0.35 l/100km, because equipment mass creep
+means a 1,200 kg car in 2024 is a physically smaller car than a 1,200 kg car in
+2019. Take the honest answer as **roughly 1.7–2.0 l/100 km, or about a fifth**.
+
+Cars built through the middle 2010s were *worse* than the five-year-older car they
+replaced. Part of that is measured — same-size cars kept gaining mass and power —
+and part is the modelled NEDC gap ramp, since a 2018 car with the same laboratory
+figure as a 2013 car burned more on the road. Comparisons whose older side is a
+converted NEDC figure inherit that assumption; `pct_measured_old` and
+`pct_measured_new` flag which rows those are.
+
+### Is the V-shape an artefact of the corrections?
+
+Fair question, since two modelling steps sit between the registry and that curve.
+It is testable, and `segment_saving_basis` (figure 17) runs the test: the identical
+saving computed on three bases.
+
+| Newer car | On the road | Type approval, no gap | Raw NEDC, uncorrected |
+|---|---|---|---|
+| 2013 | 1.28 | 1.77 | **1.50** |
+| 2019 | −0.74 | −0.14 | **−0.18** |
+| 2024 | 2.02 | 2.00 | (6% coverage) |
+
+**The V is not manufactured by the corrections.** It is there in the untouched NEDC
+declarations, which cover ~100% of both sides for every comparison up to 2019: the
+saving peaks in 2013 and crosses into negative territory in 2018–19 on raw data.
+
+What the corrections do:
+
+- The **cycle conversion cannot be responsible at all.** For NEDC-era cars
+  `sql/050` builds the on-road figure from the raw NEDC value times that year's
+  gap, never via the WLTP-equivalent — the 040 factor never enters. (The one
+  exception is plug-in hybrids, negligible before 2018.)
+- The **real-world gap ramp deepens the trough and flattens the early limb.** In
+  every NEDC-era pair the newer car carries a larger assumed gap, which subtracts
+  0.4–0.6 l/100 km from the measured saving throughout. It roughly quadruples the
+  2019 dip (−0.18 raw → −0.74 on the road) without creating it.
+- The **2024 recovery is not model-dependent**: on-road and type approval agree to
+  0.02 l/100 km, because both sides carry the same WLTP gap factor and it cancels.
+
+The raw column stops being informative after 2020 — NEDC declarations survive for
+only 5.9% of 2024 cars, and that residue is self-selected toward long-running type
+approvals. The handover years (2018–2021) carry the most model dependence, since
+they pair a converted old side with a measured new one.
+
+### The saving is powertrain switching, not engine progress
+
+Hold size *and* powertrain fixed, and the picture changes completely (figure 16).
+Petrol cars, on-road litres, by size class:
+
+| Size class | 2000 | 2013 | 2024 | since 2013 |
+|---|---|---|---|---|
+| Small (<950 kg) | 6.9 | 5.7 | 5.9 | **+3.1%** |
+| Middle (1150–1350 kg) | 9.36 | 7.54 | 7.07 | −6.3% |
+| Very large (≥1600 kg) | 14.1 | 10.8 | 12.2 | **+8.0%** |
+
+A petrol car of a given size improved about 19% between 2000 and 2013 and has
+been flat or slightly worse since. The small and very large classes now burn
+*more* than their 2013 equivalents. Practically all of the 25% five-year saving
+above comes from buying a different kind of drivetrain — by 2024, 82% of the
+heaviest size band is plug-in hybrid, consuming 4.3 l/100 km against 12.2 for a
+petrol car of the same mass.
+
+That last figure leans hard on one assumption: the Commission's +267% real-world
+correction for plug-in hybrids. If those cars are charged less than the OBFCM
+sample charged them, the saving is smaller.
+
+## The proper answer: same specification, one year newer
+
+A segment is not a specification. Inside one cell (hatchback, 1150–1350 kg) the
+hybrid share runs 0% → **35% in 2010** → 1% in 2016 → 73% in 2024, tracking Dutch
+tax incentives rather than technology; engine power drifts 91 → 98 kW over
+2014–2019 and back; diesel goes 13% → 0%. Those swings, not engine regression, are
+what the V-shape in figure 14 is mostly made of.
+
+So `sql/070_hedonic.sql` and `R/05_hedonic.R` hold the specification itself fixed:
+a regression of log fuel consumption on build-year dummies plus mass, power, fuel
+type and body type, over 20,117 cells. The year coefficients answer the question
+directly — **a car of identical size, power, fuel and shape, built a year later,
+uses how much less fuel?**
+
+Measurement is handled by splitting rather than converting. The regression is run
+twice on *raw* declarations, once per test cycle, and the two are chained over
+2019–2020 where both exist — the way a statistical agency splices an index. **No
+cycle factor and no real-world gap enters the trend at any point**, so this index
+is immune to the objection that the corrections drive the result. (The implied
+splice is 1.212, independently reproducing the 1.204 of step 040.)
+
+| | Quality-adjusted |
+|---|---|
+| Total improvement 2000 → 2024 | **45.3%** |
+| Average per year | **2.47%** |
+| 2001–2013 | 2.95% / year |
+| 2014–2024 | 1.91% / year |
+| Years that got worse | 2 of 24 (worst: 2019, +1.6%) |
+
+**Engines did not get worse.** At constant specification, efficiency improved in 22
+of 24 years. What did happen is a genuine *plateau* from 2014 to 2019 — five years
+newer bought 18.8% in 2013, 1.4% in 2019, and 15.5% again by 2024.
+
+So the answer to "how much do I save on a five-year-newer car" has two parts:
+
+- **Holding specification fixed** (figure 20): 15.5% today, near zero in 2019.
+- **As actually bought** (figure 14): ~20%, because buyers also switch to hybrids.
+
+The two nearly coincide today by coincidence — in 2019 they were 1.4% and −10.8%.
+
+One caveat on the plateau. NEDC figures for cars built after 2018 are not fresh lab
+tests; they were produced by back-conversion from WLTP. The 2014–2017 part of the
+plateau rests on genuine NEDC measurements, but its 2018–2020 tail and the chaining
+point inherit that derivation.
+
+## Within the model: a matched-model index
+
+The last cut follows the nameplate instead of the specification — a Golf against a
+Golf, a Clio against a Clio (`sql/080_model_index.sql`, figures 21–23). It is a
+chained Törnqvist index over year-on-year links, matching 175–395 models per link.
+
+Two properties make it the cleanest measure in the project:
+
+- **It needs no assumptions at all.** Each link compares one model in two adjacent
+  years on the *same* declaration, and no link straddles the cycle switch. No
+  conversion factor, no splice constant, no real-world gap enters anywhere.
+- **Renaming is handled by the chaining, not by hand.** Peugeot's 206, 207 and 208
+  overlap in the registry (206 to 2013, 207 from 2006, 208 from 2011), so each is
+  matched against itself in adjacent years and the chain passes through the
+  renaming without a break. No lineage table is needed.
+
+| Index, 2000 = 100 | 2024 | Improvement |
+|---|---|---|
+| Same **model** | 53.6 | **46.4%** |
+| Same **specification** (hedonic) | 54.7 | 45.3% |
+| Same model, alternative cycle cut | 57.9 | 42.1% |
+
+**Two methods with completely different identifying variation land within a point
+of each other.** The hedonic uses cross-sectional characteristics; the matched-model
+index uses only within-nameplate change over time and touches none of the
+corrections. Their agreement at ~45% is a much stronger result than either alone.
+
+The wedge between them is informative in both directions (figure 23). Until about
+2020 the nameplate line sits *above* the specification line: following a Golf
+delivered less than a constant specification would have, because the Golf itself
+kept growing. After 2020 it dips below, because powertrain is a control in the
+hedonic — hybridisation is stripped out there, while a nameplate that goes hybrid
+keeps the benefit.
+
+The matched-model index also corroborates the plateau independently: the same
+models got *worse* in four consecutive years, 2016–2019, and in 2019 alone they
+gained 14 kg and 2.1 kW.
+
+### A measurement finding worth recording
+
+Where both declarations exist, the two bases disagree in **every** year, with NEDC
+always showing less improvement:
+
+| Link | NEDC basis | WLTP basis |
+|---|---|---|
+| 2019 | +3.3% | −0.7% |
+| 2021 | −1.4% | −8.7% |
+
+Two things explain this and both discredit the NEDC side after 2018: those figures
+are back-conversions from WLTP rather than fresh tests, and the population still
+carrying one shrinks to 17 models by 2024, self-selected toward type approvals
+carried over unchanged. The index therefore switches to WLTP from 2019; the
+alternative cut at 2021 is reported as a sensitivity and costs 4 index points.
+
+### Why size is proxied by kerb mass
+
+RDW records a length for only 53% of cars built before 2016 (98% by 2024), and the
+missing half is not random — cars with a recorded length in 2010 average 1,085 kg
+against 1,208 kg for those without. Segmenting on length would compare a biased,
+lighter early sample against a complete late one and read the difference as
+progress. Kerb mass is recorded for every car in every year. The length-based
+version is computed anyway over 2016–2024 as a check, and is reported alongside.
+
 ## Reading the numbers correctly
 
 Four things will produce wrong answers if ignored. All four are handled in the SQL
@@ -249,11 +441,22 @@ is ~90% for 2000-2005 vintages against ~99.8% today.
 | `fleet_fuel_trend` | Fleet l/100km, electric counted as zero litres |
 | `realworld_gap_nedc` / `realworld_gap_wltp` | The gap assumptions, as data |
 | `mass_regression_stats` | Within-year moments for the constant-mass correction |
+| `consumption_by_type` / `consumption_by_size` | On-road l/100km per year × body type / size class |
+| `consumption_by_segment` | The same by type × size, the replacement cell |
+| `segment_saving` / `segment_saving_summary` | Five-year replacement saving per segment |
+| `segment_saving_length` | The same on true length bands, 2016-2024 |
+| `fixed_weight_index` | Fleet consumption at the 2000 type and size mix |
+| `segment_saving_basis` | The saving on three bases, to test the corrections |
+| `hedonic_cells` / `hedonic_splice` | Cells and regime splice for the quality-adjusted index |
+| `hedonic_coverage` | Which cycle each build year can support |
+| `model_index_links` | Year-on-year matched-model links, per cycle basis |
+| `model_histories` | Consumption history of every nameplate, for inspection |
+| `model_basket` | Fixed basket of long-lived nameplates, as a check |
 
 The 9.5M-row `vehicles` table stays in `data/fuelecon.duckdb`; query it directly for
 anything the aggregates do not cover.
 
-`R/run_analysis.R` writes eleven figures to `output/figures/`. `docs/results.html`
+`R/run_analysis.R` writes twenty-three figures to `output/figures/`. `docs/results.html`
 presents them with the numbers and caveats; regenerate it with
 `python3 docs/build_page.py` after re-running the analysis.
 

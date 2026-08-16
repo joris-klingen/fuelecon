@@ -11,6 +11,7 @@ suppressPackageStartupMessages({
   library(dplyr)
   library(readr)
   library(tidyr)
+  library(tibble)
 })
 
 project_root <- function() {
@@ -34,19 +35,19 @@ read_table <- function(name) {
   read_csv(path, show_col_types = FALSE, progress = FALSE)
 }
 
-# Dutch labels for the powertrain codes the SQL layer emits, in the order they
+# Labels for the powertrain codes the SQL layer emits, in the order they
 # should stack and appear in legends: combustion first, electrified last.
 POWERTRAIN_LEVELS <- c("Petrol", "Diesel", "LPG", "CNG", "HEV", "PHEV", "BEV",
                        "FCEV", "Other", "Unknown")
-POWERTRAIN_NL <- c(
-  Petrol = "benzine", Diesel = "diesel", LPG = "lpg", CNG = "cng",
-  HEV = "hybride", PHEV = "plug-in hybride", BEV = "elektrisch",
-  FCEV = "waterstof", Other = "overig", Unknown = "onbekend"
+POWERTRAIN_LABELS <- c(
+  Petrol = "petrol", Diesel = "diesel", LPG = "LPG", CNG = "CNG",
+  HEV = "hybrid", PHEV = "plug-in hybrid", BEV = "electric",
+  FCEV = "hydrogen", Other = "other", Unknown = "unknown"
 )
 
 label_powertrain <- function(x) {
-  factor(unname(POWERTRAIN_NL[x]),
-         levels = unname(POWERTRAIN_NL[POWERTRAIN_LEVELS]))
+  factor(unname(POWERTRAIN_LABELS[x]),
+         levels = unname(POWERTRAIN_LABELS[POWERTRAIN_LEVELS]))
 }
 
 # Powertrains with enough of a presence to carry their own line; the rest are

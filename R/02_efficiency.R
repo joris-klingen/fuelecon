@@ -23,16 +23,16 @@ cycle_series <- efficiency_trend |>
   mutate(share = vehicles / sum(vehicles)) |>
   ungroup() |>
   filter(share >= 0.02, vehicles >= 1000) |>
-  mutate(cyclus = factor(test_cycle, levels = c("NEDC", "WLTP")))
+  mutate(cycle = factor(test_cycle, levels = c("NEDC", "WLTP")))
 
 # ---- figure 4: the headline CO2 trend, cycle-split ----------------------------
 
-p_cycle <- cpb_line(cycle_series, x = build_year, y = median_co2_g_km, colour = cyclus,
+p_cycle <- cpb_line(cycle_series, x = build_year, y = median_co2_g_km, colour = cycle,
   index = c(6, 2),
   points = TRUE,
-  title = "Type-keuring CO2 per bouwjaar, per testcyclus",
-  ylab  = "gram CO2 per km (mediaan)",
-  xlab  = "bouwjaar") +
+  title = "Type-approval CO2 by build year and test cycle",
+  ylab  = "grams CO2 per km (median)",
+  xlab  = "build year") +
   scale_x_year()
 
 fig(p_cycle, "04_co2_by_test_cycle")
@@ -43,16 +43,16 @@ fig(p_cycle, "04_co2_by_test_cycle")
 # zero-tailpipe cars counted in and once with only the cars that burn fuel.
 fleet_long <- fleet_co2 |>
   select(build_year,
-         `alle auto's (elektrisch = 0)` = mean_co2_tailpipe,
-         `alleen verbrandingsmotoren`   = mean_co2_combustion_only) |>
-  pivot_longer(-build_year, names_to = "reeks", values_to = "co2")
+         `all cars (electric = 0)`  = mean_co2_tailpipe,
+         `combustion engines only`  = mean_co2_combustion_only) |>
+  pivot_longer(-build_year, names_to = "series", values_to = "co2")
 
-p_fleet <- cpb_line(fleet_long, x = build_year, y = co2, colour = reeks,
+p_fleet <- cpb_line(fleet_long, x = build_year, y = co2, colour = series,
   index = c(6, 2),
-  title = "Gemiddelde uitlaat-CO2 per bouwjaar",
-  subtitle = "piek in 2019 is de overgang van NEDC naar WLTP, geen echte verslechtering",
-  ylab  = "gram CO2 per km",
-  xlab  = "bouwjaar") +
+  title = "Mean tailpipe CO2 by build year",
+  subtitle = "the 2019 peak is the NEDC to WLTP switch, not a real deterioration",
+  ylab  = "grams CO2 per km",
+  xlab  = "build year") +
   scale_x_year()
 
 fig(p_fleet, "05_fleet_vs_combustion_co2")
@@ -66,14 +66,14 @@ pt_series <- eff_powertrain |>
   group_by(build_year, powertrain) |>
   slice_max(vehicles, n = 1, with_ties = FALSE) |>
   ungroup() |>
-  mutate(aandrijving = label_powertrain(powertrain))
+  mutate(powertrain_label = label_powertrain(powertrain))
 
-p_pt <- cpb_line(pt_series, x = build_year, y = median_co2_g_km, colour = aandrijving,
+p_pt <- cpb_line(pt_series, x = build_year, y = median_co2_g_km, colour = powertrain_label,
   index = c(6, 5, 4, 2),
-  title = "CO2 per bouwjaar naar aandrijving",
-  subtitle = "breuk rond 2018 is de overgang van NEDC naar WLTP",
-  ylab  = "gram CO2 per km (mediaan)",
-  xlab  = "bouwjaar") +
+  title = "CO2 by build year and powertrain",
+  subtitle = "the break around 2018 is the NEDC to WLTP switch",
+  ylab  = "grams CO2 per km (median)",
+  xlab  = "build year") +
   scale_x_year()
 
 fig(p_pt, "06_co2_by_powertrain")
@@ -91,18 +91,18 @@ norm <- eff_normalised |>
   filter(test_cycle == "NEDC") |>
   select(build_year, powertrain, median_co2_g_km, median_co2_per_tonne) |>
   pivot_longer(c(median_co2_g_km, median_co2_per_tonne),
-               names_to = "maat", values_to = "waarde") |>
-  mutate(maat = recode(maat,
+               names_to = "measure", values_to = "value") |>
+  mutate(measure = recode(measure,
            median_co2_g_km      = "CO2 per km",
-           median_co2_per_tonne = "CO2 per km per ton ledig gewicht"),
-         aandrijving = label_powertrain(powertrain))
+           median_co2_per_tonne = "CO2 per km per tonne kerb mass"),
+         powertrain_label = label_powertrain(powertrain))
 
 p_norm <- cpb_line(filter(norm, powertrain == "Petrol"),
-  x = build_year, y = waarde, colour = maat,
+  x = build_year, y = value, colour = measure,
   index = c(6, 2),
-  title = "Benzineauto's: CO2 per km en per ton, NEDC",
-  ylab  = "gram CO2",
-  xlab  = "bouwjaar") +
+  title = "Petrol cars: CO2 per km and per tonne, NEDC",
+  ylab  = "grams CO2",
+  xlab  = "build year") +
   scale_x_year(to = 2018)
 
 fig(p_norm, "07_co2_per_tonne_petrol")

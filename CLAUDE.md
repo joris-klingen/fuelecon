@@ -46,6 +46,9 @@ or plotting into SQL.
   `02_efficiency.R` and `03_adjusted.R` each build figures and a `*_facts` list
   that `run_analysis.R` prints.
 - `docs/build_page.py` — regenerates `docs/results.html` from `output/figures/`.
+  The page is deliberately short: five figures chosen for the marginal-cost-of-
+  driving question, an abstract, two tables and a limitations note. Adding figures
+  to it is a decision, not a default.
 
 ## The three corrections
 
@@ -65,6 +68,34 @@ or plotting into SQL.
   the technology trend contaminate it. Compute moments in SQL, assemble in R.
   Always use the pooled-powertrain version for fleet statements — within petrol
   alone, mass is nearly flat because heavy cars electrified out of the category.
+
+## Segments (060)
+
+Size is proxied by **kerb mass**, not length: length is recorded for only 53% of
+pre-2016 cars and the missing half is systematically 120 kg heavier, so a
+length-based segment would read sample bias as progress. The cost is that mass
+creep makes a fixed mass band drift toward physically smaller cars, which
+overstates the saving; `segment_saving_length` quantifies that on 2016-2024.
+
+Before quoting any five-year saving, check `pct_measured_old` / `pct_measured_new`.
+Only 2024-vs-2019 has both sides essentially measured on WLTP; earlier rows inherit
+the assumed NEDC gap ramp and are modelled, not measured.
+
+For any claim about *engines*, use the hedonic index (`070`) or the matched-model
+index (`080`), not a segment mean. The matched-model index is the one to reach for
+first: each link compares one model in two adjacent years on the same declaration,
+so it carries no conversion, splice or gap assumption at all. The two indices agree
+to within a point (46.4% against 45.3%), which is the project's strongest result.
+Note that NEDC declarations after 2018 are back-conversions and show systematically
+less improvement than WLTP in every overlap year; prefer WLTP links from 2019. A segment is not a specification: inside one cell the hybrid share
+swings 0-35-1-73% with Dutch tax policy and power drifts 7 kW. The index is
+estimated on raw declarations per cycle and chained over 2019-2020, so no cycle
+factor or gap assumption touches it.
+
+Hold size *and* powertrain fixed (`mean_l_petrol`) before claiming engine progress.
+Petrol cars of a given size have been flat since 2013 — the headline saving is
+almost entirely people buying hybrids, and in the heaviest band it rests on the
++267% PHEV real-world correction.
 
 ## Domain traps
 
@@ -88,7 +119,9 @@ sometimes as `0`, which is why casts are `TRY_CAST` with `nullif(..., 0)`.
 ## Conventions
 
 - Raw columns keep their Dutch RDW names; derived columns are English snake_case.
-- Figures and their labels are Dutch (CPB house style); code and comments English.
+- Everything user-facing is English: figure titles, axis labels, series names,
+  the console summary and `docs/results.html`. Class labels (size bands, body
+  types) are emitted in English by the SQL layer, not translated in R.
 - Everything is read from CSV as VARCHAR and cast once, explicitly, in `010`.
 - `data/` and `output/` are gitignored — reproducible, never committed.
 - Paths in DuckDB SQL are inlined via `sql_literal()`, not bound as parameters:

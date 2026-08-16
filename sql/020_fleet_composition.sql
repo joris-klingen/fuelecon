@@ -96,7 +96,7 @@ ORDER BY vehicles DESC;
 CREATE OR REPLACE TABLE fleet_by_body_type AS
 SELECT
     build_year,
-    coalesce(body_type, 'onbekend')                      AS body_type,
+    coalesce(body_type, 'unknown')                      AS body_type,
     count(*)                                             AS vehicles,
     round(100.0 * count(*) / sum(count(*)) OVER (PARTITION BY build_year), 2) AS pct_of_year,
     round(avg(kerb_mass_kg))                             AS mean_kerb_mass_kg,
