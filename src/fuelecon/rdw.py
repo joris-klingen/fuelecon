@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 import logging
 import time
@@ -22,7 +23,7 @@ MAX_ATTEMPTS = 5
 class DownloadState:
     """Resume point for a dataset download, persisted after every page."""
 
-    cursor: str | None = None
+    cursor: list[str] | None = None
     rows: int = 0
     pages: int = 0
     complete: bool = False
@@ -31,7 +32,10 @@ class DownloadState:
     def load(cls, path: Path) -> DownloadState:
         if not path.exists():
             return cls()
-        return cls(**json.loads(path.read_text()))
+        state = cls(**json.loads(path.read_text()))
+        if isinstance(state.cursor, str):  # written before keys could be composite
+            state.cursor = [state.cursor]
+        return state
 
     def save(self, path: Path) -> None:
         path.write_text(json.dumps(self.__dict__, indent=2))
@@ -41,19 +45,35 @@ def _quote(value: str) -> str:
     return "'" + value.replace("'", "''") + "'"
 
 
+def _keyset_clause(columns: tuple[str, ...], cursor: list[str], inclusive: bool) -> str:
+    """SoQL for ``(c1, ..., cn) > cursor``, expanded term by term.
+
+    SoQL has no row-value comparison, so the lexicographic test is written out:
+    ``c1 > v1 OR (c1 = v1 AND c2 > v2) OR ...``. ``inclusive`` makes the final
+    comparison ``>=``, which is how a dropped boundary group gets re-requested.
+    """
+    terms = []
+    for i, column in enumerate(columns):
+        equalities = [
+            f"{c} = {_quote(v)}" for c, v in zip(columns[:i], cursor[:i], strict=True)
+        ]
+        op = ">=" if inclusive and i == len(columns) - 1 else ">"
+        terms.append(" AND ".join([*equalities, f"{column} {op} {_quote(cursor[i])}"]))
+    return " OR ".join(f"({t})" for t in terms)
+
+
 def _fetch_page(
-    client: httpx.Client, dataset: Dataset, cursor: str | None, app_token: str | None
+    client: httpx.Client, dataset: Dataset, cursor: list[str] | None, app_token: str | None
 ) -> str:
     clauses = [dataset.where] if dataset.where else []
     if cursor is not None:
         # ``>=`` for duplicate keys: the boundary group was dropped from the last
         # page, so re-requesting it is what makes the download lossless.
-        op = ">=" if dataset.duplicate_keys else ">"
-        clauses.append(f"{dataset.order_by} {op} {_quote(cursor)}")
+        clauses.append(_keyset_clause(dataset.order_by, cursor, dataset.duplicate_keys))
 
     params = {
         "$select": ",".join(dataset.columns),
-        "$order": dataset.order_by,
+        "$order": ",".join(dataset.order_by),
         "$limit": str(PAGE_SIZE),
     }
     if clauses:
@@ -88,10 +108,14 @@ def _split_page(text: str) -> tuple[str, list[str]]:
     return lines[0], [line for line in lines[1:] if line]
 
 
-def _key_of(row: str) -> str:
-    """First CSV field of a row. RDW keys are plain alphanumerics, never quoted-comma."""
-    field = row.split(",", 1)[0]
-    return field.strip('"')
+def _key_of(row: str, width: int = 1) -> list[str]:
+    """The leading ``width`` CSV fields of a row, which are the ordering key.
+
+    Parsed with the csv module rather than split(','): type-approval version codes
+    are free-form manufacturer strings, and one containing a comma would otherwise
+    shift the key and silently corrupt the cursor.
+    """
+    return next(csv.reader([row]))[:width]
 
 
 def download(
@@ -119,6 +143,12 @@ def download(
     if state.cursor and not dataset.raw_path.exists():
         log.warning("%s: state file without CSV, restarting from scratch", dataset.key)
         state = DownloadState()
+    if state.cursor and len(state.cursor) != len(dataset.order_by):
+        # The ordering key changed since the download paused, so the rows already on
+        # disk are in an order the new cursor cannot resume from.
+        log.warning("%s: ordering key changed, restarting from scratch", dataset.key)
+        dataset.raw_path.unlink(missing_ok=True)
+        state = DownloadState()
 
     started = time.monotonic()
     pages_this_run = 0
@@ -135,14 +165,19 @@ def download(
             # trailing key group is complete and must be kept rather than dropped.
             final_page = len(rows) < PAGE_SIZE
 
-            last_key = _key_of(rows[-1])
+            width = len(dataset.order_by)
+            last_key = _key_of(rows[-1], width)
             if dataset.duplicate_keys and not final_page:
                 # Drop the trailing key group; the next page starts at it again.
-                keep = [r for r in rows if _key_of(r) != last_key]
-                if not keep:
+                # Rows arrive ordered, so the group is the contiguous run at the end.
+                cut = len(rows)
+                while cut and _key_of(rows[cut - 1], width) == last_key:
+                    cut -= 1
+                if not cut:
                     raise RuntimeError(
                         f"{dataset.key}: key {last_key!r} fills a whole page; raise PAGE_SIZE"
                     )
+                keep = rows[:cut]
                 next_cursor = last_key
             else:
                 keep = rows

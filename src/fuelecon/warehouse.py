@@ -13,8 +13,21 @@ from .ingest import sql_literal
 
 log = logging.getLogger(__name__)
 
-# Intermediate tables that exist to serve the result tables, not to be read.
-STAGING_TABLES = frozenset({"vehicles", "model_lookup"})
+# Tables held back from the CSV export: either intermediates that exist to serve
+# the result tables, or per-vehicle and per-version tables running to millions of
+# rows, which are meant to be queried in the warehouse rather than shipped as CSV.
+STAGING_TABLES = frozenset({
+    "vehicles",
+    "model_lookup",
+    "variant_energy",
+    "variant_basis",
+    "variant_drivetrain",
+    "variant_gearbox",
+    "variants",
+    "vehicle_variant",
+    "vehicle_energy_wide",
+    "vehicle_energy",
+})
 
 
 def connect(read_only: bool = False) -> duckdb.DuckDBPyConnection:

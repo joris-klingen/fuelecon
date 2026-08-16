@@ -24,13 +24,15 @@ between laboratory and road, and cars getting heavier.
 
 ```bash
 uv sync                       # Python: duckdb + httpx
-uv run fuelecon all           # download ~26M rows, build the warehouse, export CSV
+uv run fuelecon all           # download ~47M rows, build the warehouse, export CSV
 Rscript R/run_analysis.R      # analysis and figures in CPB house style
 ```
 
-The ingest takes about 12 minutes over the RDW API and is resumable — interrupt it
+The ingest takes about 25 minutes over the RDW API and is resumable — interrupt it
 and re-run, it picks up from the last page. `uv run fuelecon info` shows what is on
-disk.
+disk. Roughly half of that is the four type-approval tables; pass
+`uv run fuelecon ingest vehicles fuel` to skip them and build the fleet series
+alone.
 
 ## How it fits together
 
@@ -55,7 +57,9 @@ interpretation and the figures, so it never handles more than a few thousand row
 | Download | `src/fuelecon/rdw.py` | Resumable keyset pagination over the Socrata API |
 | Ingest | `src/fuelecon/ingest.py` | CSV → Parquet, everything as VARCHAR |
 | Transform | `sql/010_vehicles.sql` | Join, cast, classify powertrain and test cycle |
+| Type approval | `sql/015_type_approval.sql` | Plate → approval → variant → version |
 | Aggregate | `sql/020_*.sql`, `sql/030_*.sql` | Fleet composition and efficiency tables |
+| Per car | `sql/060_vehicle_energy.sql` | Energy per km per carrier, with provenance |
 | Analysis | `R/` | Figures in CPB house style via `ggcpb`, headline numbers |
 
 ### Data sources
@@ -64,11 +68,16 @@ interpretation and the figures, so it never handles more than a few thousand row
 |---|---|---|
 | [`m9d7-ebf2`](https://opendata.rdw.nl/dataset/m9d7-ebf2) | 9,529,597 (filtered) | Registry: make, model, build year, mass, dimensions |
 | [`8ys7-d773`](https://opendata.rdw.nl/dataset/8ys7-d773) | 16,936,567 | Fuel and emissions: consumption, CO2, Euro standard |
+| [`gr7t-qfnb`](https://opendata.rdw.nl/dataset/gr7t-qfnb) | 6,330,502 | Type approval: energy declarations per version |
+| [`byxc-wwua`](https://opendata.rdw.nl/dataset/byxc-wwua) | 2,955,968 (M1 only) | Type approval: masses, dimensions, road load |
+| [`4by9-ammk`](https://opendata.rdw.nl/dataset/4by9-ammk) | 6,144,109 | Type approval: engine and drive |
+| [`7rjk-eycs`](https://opendata.rdw.nl/dataset/7rjk-eycs) | 5,819,853 | Type approval: transmission |
 
 The registry is filtered server-side to `voertuigsoort='Personenauto'` with first
-admission in 2000-2024. The fuel table cannot be filtered to those vehicles
-server-side (Socrata has no cross-dataset joins), so it is taken whole and joined
-locally.
+admission in 2000-2024. Nothing else can be filtered to those vehicles server-side
+(Socrata has no cross-dataset joins), so the fuel and type-approval tables are taken
+whole and joined locally — except the road-load table, which carries a vehicle
+category and is cut to `M1%` at the source.
 
 ## Findings
 
@@ -194,6 +203,74 @@ a larger car electrified it left the petrol category and took its mass with it. 
 fleet-wide mass gain is largely that composition shift, so the correction is only
 meaningful with the powertrains pooled. Both are reported.
 
+## Per-car energy, for comparing two specific cars
+
+Everything above is about the fleet. A different question — what does *this* car
+cost to drive, and how does that differ from the one it replaced — needs a
+different table, because the cost of a kilometre is
+
+    sum over carriers of  (energy per km) x (price per unit)
+
+and the fleet corrections are the wrong resolution for a difference between two
+cars. They are constant within powertrain (WLTP era) or within build year (NEDC
+era), so for a petrol-to-electric comparison the correction is a deterministic
+function of the two powertrains: it carries nothing a powertrain dummy would not,
+while looking like it does.
+
+So `sql/015_type_approval.sql` and `sql/060_vehicle_energy.sql` build a per-car
+layer that leaves the fleet series untouched.
+
+### The type-approval chain
+
+A licence plate names the exact version it was certified as:
+
+    kenteken                                  H738VS
+      typegoedkeuringsnummer                  e1*2007/46*0627*09
+      variant                                 SACCYVBX0
+      uitvoering                              FD7FD7CW001N7MMOVL01VR2
+
+That is a far finer object than make and model — it fixes the drivetrain and body
+the figures were measured on. 90.4% of 2000 vintages carry the keys, rising to
+99.2% of 2024 ones. Following them into the type-approval tables adds three things
+the licence plate does not hold:
+
+- **The NEDC phase split.** Urban and extra-urban CO2 separately, which differ by
+  about a third on the same certificate. The plate carries only the combined
+  figure, so a household doing short trips and one doing motorway miles get the
+  same number.
+- **Both bounds of every declaration.** A version quotes a range; the plate quotes
+  a point. `spread_pct` says how much the one number is standing in for.
+- **Road load.** The coast-down polynomial `F(v) = f0 + f1·v + f2·v²` the
+  dynamometer was set to — rolling resistance and aerodynamic drag, the only
+  physical description of the car anywhere in this data. It arrived with WLTP, so
+  it exists for roughly 2018 onwards, which is where the electric switches are.
+
+### `vehicle_energy`
+
+One row per licence plate per energy carrier — petrol, diesel, LPG, CNG,
+electricity — so attaching a price series is a join rather than a rewrite of the
+arithmetic per powertrain combination. Each row says where its figure came from:
+
+| `basis` | Meaning |
+|---|---|
+| `wltp_plate` | WLTP declaration on the licence plate |
+| `wltp_variant` | WLTP declaration on the type-approval version |
+| `nedc_plate` | NEDC declaration on the licence plate, converted |
+| `nedc_variant` | NEDC declaration on the version, converted |
+| `none` | The car uses this carrier and no figure was found |
+
+The `_variant` rows are what the chain buys: plates whose own fuel record is blank.
+Rows are emitted even when the figure is missing, so a price join returns a null
+cost rather than dropping the car. `energy_coverage_by_year` reports the mix per
+vintage, and `variant_match_quality` reports how well the chain held.
+
+Two things this table deliberately does not do. It does not apply the constant-mass
+counterfactual, which answers a fleet question and says nothing about what a
+specific car costs its owner. And it puts no on-road correction on electricity:
+there is a real gap between a battery car's WLTP figure and what it draws in Dutch
+conditions, but no sourced series for it here, and a fabricated one would land on
+exactly the side of the comparison that matters.
+
 ## Reading the numbers correctly
 
 Four things will produce wrong answers if ignored. All four are handled in the SQL
@@ -249,9 +326,18 @@ is ~90% for 2000-2005 vintages against ~99.8% today.
 | `fleet_fuel_trend` | Fleet l/100km, electric counted as zero litres |
 | `realworld_gap_nedc` / `realworld_gap_wltp` | The gap assumptions, as data |
 | `mass_regression_stats` | Within-year moments for the constant-mass correction |
+| `variant_match_quality` | How far the type-approval chain reaches, per vintage |
+| `energy_coverage_by_year` | Where each vintage's per-car figure comes from |
 
-The 9.5M-row `vehicles` table stays in `data/fuelecon.duckdb`; query it directly for
-anything the aggregates do not cover.
+The per-vehicle and per-version tables — `vehicles`, `vehicle_energy`,
+`vehicle_variant`, `variants` — stay in `data/fuelecon.duckdb` rather than being
+written out as CSV, because they run to millions of rows. Query them directly:
+
+```sql
+-- Energy and its provenance for one car, per carrier.
+SELECT carrier, unit, energy_per_100km_typeapproval, basis, spread_pct
+FROM vehicle_energy WHERE kenteken = 'H738VS';
+```
 
 `R/run_analysis.R` writes eleven figures to `output/figures/`. `docs/results.html`
 presents them with the numbers and caveats; regenerate it with

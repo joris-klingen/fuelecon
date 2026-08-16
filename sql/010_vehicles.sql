@@ -13,8 +13,18 @@ WITH v AS (
         -- the car entered service abroad, not the year it reached the Netherlands.
         TRY_CAST(datum_eerste_toelating[1:4] AS INTEGER)              AS build_year,
         TRY_CAST(datum_eerste_tenaamstelling_in_nederland[1:4] AS INTEGER) AS nl_registration_year,
+        -- Date the car was put in its current owner's name. The register keeps
+        -- only the standing one, not the history, so this is the start of the
+        -- current ownership spell and nothing before it.
+        TRY_STRPTIME(datum_tenaamstelling, '%Y%m%d')::DATE            AS owner_since,
         upper(trim(merk))                                             AS make,
         upper(trim(handelsbenaming))                                  AS model_raw,
+        -- Keys into the type-approval tables, used in sql/015_type_approval.sql.
+        nullif(trim(typegoedkeuringsnummer), '')                      AS tgk_number,
+        nullif(trim(type), '')                                        AS tgk_type,
+        nullif(trim(variant), '')                                     AS tgk_variant,
+        nullif(trim(uitvoering), '')                                  AS tgk_version,
+        TRY_CAST(volgnummer_wijziging_eu_typegoedkeuring AS INTEGER)  AS tgk_revision,
         nullif(trim(inrichting), '')                                  AS body_type,
         nullif(trim(europese_voertuigcategorie), '')                  AS eu_category,
         nullif(TRY_CAST(massa_ledig_voertuig AS INTEGER), 0)          AS kerb_mass_kg,
@@ -25,6 +35,8 @@ WITH v AS (
         nullif(TRY_CAST(aantal_deuren AS INTEGER), 0)                 AS doors,
         nullif(TRY_CAST(lengte AS INTEGER), 0)                        AS length_cm,
         nullif(TRY_CAST(breedte AS INTEGER), 0)                       AS width_cm,
+        nullif(TRY_CAST(hoogte_voertuig AS INTEGER), 0)               AS height_cm,
+        nullif(TRY_CAST(wielbasis AS INTEGER), 0)                     AS wheelbase_cm,
         nullif(TRY_CAST(catalogusprijs AS INTEGER), 0)                AS list_price_eur,
         nullif(trim(zuinigheidsclassificatie), '')                    AS energy_label,
         trim(export_indicator)   = 'Ja'                               AS exported,
@@ -48,6 +60,13 @@ f AS (
         max(TRY_CAST(brandstofverbruik_gecombineerd AS DOUBLE))        AS l_100km_nedc,
         max(TRY_CAST(co2_uitstoot_gecombineerd AS DOUBLE))             AS co2_nedc,
         max(TRY_CAST(co2_uitstoot_gewogen AS DOUBLE))                  AS co2_nedc_weighted,
+        -- The NEDC-era weighted pair, which is what a pre-2018 plug-in hybrid was
+        -- certified on. These are read but deliberately left out of the l_100km and
+        -- co2_g_km chains below, which the whole fleet series rests on; sql/060
+        -- picks them up where a per-car figure is what is wanted.
+        max(TRY_CAST(brandstofverbruik_gewogen_gecombineerd AS DOUBLE)) AS l_100km_nedc_weighted,
+        max(TRY_CAST(elektriciteitsverbruik_gewogen_gecombineerd AS DOUBLE))
+                                                                       AS kwh_100km_nedc_weighted,
 
         -- WLTP declarations. "gewogen" (weighted) variants are the utility-factor
         -- weighted numbers that plug-in hybrids are certified on.
@@ -61,6 +80,12 @@ f AS (
         max(TRY_CAST(elektrisch_verbruik_extern_opladen_wltp AS DOUBLE))     AS kwh_100km_ovc_wltp,
         max(TRY_CAST(elektriciteitsverbruik_volledig_elektrisch AS DOUBLE))  AS kwh_100km_bev,
         max(TRY_CAST(actie_radius_enkel_elektrisch_wltp AS DOUBLE))          AS ev_range_km,
+        -- Externally charged range: the denominator of any utility factor, and so
+        -- of any statement about what a plug-in hybrid costs to drive.
+        max(TRY_CAST(actie_radius_extern_opladen_wltp AS DOUBLE))            AS ev_range_ovc_km,
+        max(TRY_CAST(actieradius_extern_oplaadbaar AS DOUBLE))               AS ev_range_ovc_nedc_km,
+        max(TRY_CAST(actieradius AS DOUBLE))                                 AS range_km,
+        max(nullif(trim(co2_emissieklasse), ''))                             AS co2_class,
 
         max(TRY_CAST(nettomaximumvermogen AS DOUBLE))                  AS power_kw,
         max(TRY_CAST(netto_max_vermogen_elektrisch AS DOUBLE))         AS power_kw_electric,
@@ -79,6 +104,12 @@ SELECT
     f.power_kw,
     f.power_kw_electric,
     f.ev_range_km,
+    f.ev_range_ovc_km,
+    f.ev_range_ovc_nedc_km,
+    f.range_km,
+    f.co2_class,
+    f.l_100km_nedc_weighted,
+    f.kwh_100km_nedc_weighted,
 
     -- Powertrain. RDW registers one fuel row per fuel the car can run on, so both
     -- a plug-in hybrid and a self-charging hybrid carry Benzine *and*
@@ -139,6 +170,15 @@ SELECT
     CASE WHEN coalesce(f.kwh_100km_bev_wltp, f.kwh_100km_bev, f.kwh_100km_ovc_wltp)
               BETWEEN 5 AND 60
          THEN coalesce(f.kwh_100km_bev_wltp, f.kwh_100km_bev, f.kwh_100km_ovc_wltp) END AS kwh_100km,
+    -- The two electric figures kept apart, because for a plug-in hybrid they are
+    -- different quantities: "enkel elektrisch" is what it draws while running on
+    -- the battery, "extern opladen" is what it draws per 100 km of driving once the
+    -- regulatory utility factor is applied. Only the second pairs with the weighted
+    -- litres; pairing the first with them counts the same kilometres twice.
+    CASE WHEN f.kwh_100km_bev_wltp BETWEEN 5 AND 60
+         THEN f.kwh_100km_bev_wltp END                                AS kwh_100km_bev_wltp,
+    CASE WHEN f.kwh_100km_ovc_wltp BETWEEN 5 AND 60
+         THEN f.kwh_100km_ovc_wltp END                                AS kwh_100km_ovc_wltp,
 
     -- Tailpipe CO2 for fleet-wide averages. RDW leaves CO2 null for battery-electric
     -- and fuel-cell cars rather than recording a zero, so a plain median over
