@@ -111,7 +111,8 @@ p_mass <- cpb_line(petrol_cm, x = build_year, y = l, colour = reeks,
   subtitle = "binnen benzine alleen blijft het gewicht vrijwel gelijk: nauwelijks effect",
   ylab  = "liter per 100 km",
   xlab  = "bouwjaar") +
-  scale_x_year()
+  scale_x_year() +
+  expand_limits(y = 0)
 
 fig(p_mass, "09_petrol_constant_mass")
 
@@ -128,7 +129,8 @@ p_mass_fleet <- cpb_line(fleet_cm, x = build_year, y = l, colour = reeks,
   subtitle = "verschil tussen de lijnen is wat het zwaarder worden heeft gekost",
   ylab  = "liter per 100 km",
   xlab  = "bouwjaar") +
-  scale_x_year()
+  scale_x_year() +
+  expand_limits(y = 0)
 
 fig(p_mass_fleet, "11_fleet_constant_mass")
 
